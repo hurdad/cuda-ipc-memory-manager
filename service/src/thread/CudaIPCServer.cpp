@@ -1,14 +1,21 @@
 #include "CudaIPCServer.h"
 
-CudaIPCServer::CudaIPCServer(const std::string& endpoint)
-  : context_(1),
+CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
+  : configuration_(configuration),
+    context_(1),
     socket_(context_, zmq::socket_type::rep),
-    endpoint_(endpoint),
     running_(false) {
-  socket_.bind(endpoint_);
+
+  // Init GPU Device
+  CudaUtils::InitDevice(configuration->gpu_device_index());
+
+  // bind zmq req socket
+  socket_.bind(configuration->zmq_request_endpoint()->str());
+
+  // set socket timeout so we dont block forever
   socket_.set(zmq::sockopt::rcvtimeo, 500);
 
-  spdlog::info("Server listening on {}", endpoint_);
+  spdlog::info("Server listening on {}", configuration->zmq_request_endpoint()->str());
 }
 
 CudaIPCServer::~CudaIPCServer() {
@@ -20,6 +27,8 @@ CudaIPCServer::~CudaIPCServer() {
 
 void CudaIPCServer::start() {
   running_       = true;
+
+  // Start server zmq server thread
   server_thread_ = std::thread(&CudaIPCServer::run, this);
 
   // Start expiration cleanup thread
@@ -207,14 +216,6 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
 
   // decrement access counter
   gpu_buffer_entry.access_counter--;
-
-  // Delete the GPU buffer if it has no remaining accessors and expiration is ACCESS-based
-  // if (gpu_buffer_entry.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS &&
-  //     gpu_buffer_entry.access_counter == 0 &&
-  //     gpu_buffer_entry.access_ids.empty()) {
-  //   CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
-  //   buffers_.erase(buffer_id);
-  // }
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {
@@ -239,7 +240,7 @@ void CudaIPCServer::cleanupExpiredBuffers() {
   for (auto it = buffers_.begin(); it != buffers_.end();) {
     auto& record = it->second;
 
-    // Example expiration rule:
+    // check for expiration
     if (record.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_TIMESTAMP) {
       if (now >= record.expiration_timestamp) {
         spdlog::info("Buffer expired. Releasing GPU memory.");

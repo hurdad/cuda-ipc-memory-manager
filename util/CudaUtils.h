@@ -6,6 +6,12 @@
 class CudaUtils {
 public:
   /**
+   * @brief Initalize CUDA device.
+   * @param device_id
+   */
+  static void InitDevice(const int device_id) ;
+
+  /**
    * @brief Allocates a buffer on the CUDA device.
    * @param numBytes Number of bytes to allocate.
    * @return Pointer to the device buffer, or nullptr on failure.

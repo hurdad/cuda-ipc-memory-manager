@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   auto config = fbs::cuda::ipc::service::GetConfiguration(config_binary.data());
 
   // init cuda ipc server
-  CudaIPCServer server(config->zmq_router_endpoint()->str());
+  CudaIPCServer server(config);
   server.start();
 
   // wait until shutdown

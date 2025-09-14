@@ -21,6 +21,7 @@
 #include "CudaUtils.h"
 
 // FlatBuffers header generated from schema .fbs
+#include "service_generated.h"
 #include "api/rpc_request_generated.h"
 #include "api/rpc_response_generated.h"
 
@@ -59,7 +60,7 @@ struct GPUBufferRecord {
 
 class CudaIPCServer {
 public:
-  CudaIPCServer(const std::string& endpoint);
+  CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration);
   ~CudaIPCServer();
 
   void start();
@@ -67,11 +68,11 @@ public:
   void join();
 
 private:
+  const fbs::cuda::ipc::service::Configuration*                                            configuration_;
   zmq::context_t                                                                           context_;
   zmq::socket_t                                                                            socket_;
   std::thread                                                                              server_thread_;
   std::thread                                                                              expiration_thread_;
-  std::string                                                                              endpoint_;
   std::atomic<bool>                                                                        running_; // stop flag
   std::unordered_map<boost::uuids::uuid, GPUBufferRecord, boost::hash<boost::uuids::uuid>> buffers_;
   std::mutex                                                                               buffers_mutex_; // <-- Protects access to buffers_

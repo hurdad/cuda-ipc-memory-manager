@@ -5,6 +5,17 @@
 #include <stdexcept>
 #include <cstring>
 
+
+void CudaUtils::InitDevice(const int device_id) {
+  cudaError_t status = cudaSetDevice(device_id);
+  if (status != cudaSuccess) {
+    std::cerr << "[CudaUtils] cudaSetDevice failed: " << cudaGetErrorString(status) << "\n";
+    throw std::runtime_error("cudaSetDevice failed");
+  }
+
+  std::cout << "[CudaUtils] Set device to " << device_id << "\n";
+}
+
 void* CudaUtils::AllocDeviceBuffer(size_t numBytes) {
   void*       d_buffer = nullptr;
   cudaError_t status   = cudaMalloc(&d_buffer, numBytes);

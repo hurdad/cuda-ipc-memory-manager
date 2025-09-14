@@ -15,7 +15,7 @@ namespace fbs.cuda.ipc.service;
 // ---------------------------------------------------------------------------
 table Configuration {
   gpu_device_index: uint8;      // Index of the GPU device to use
-  zmq_router_endpoint: string;  // ZeroMQ ROUTER endpoint for IPC communication
+  zmq_request_endpoint: string; // ZeroMQ REQUEST endpoint for IPC communication
   prometheus_endpoint: string;  // HTTP endpoint for Prometheus metrics
 }
 
