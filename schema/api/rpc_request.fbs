@@ -1,0 +1,49 @@
+// ============================================================================
+// File: rpc_request.fbs
+// Namespace: fbs.cuda.ipc.api
+// ---------------------------------------------------------------------------
+// RPC Request tables for CUDA IPC, using common definitions.
+// ============================================================================
+
+include "common.fbs";
+
+namespace fbs.cuda.ipc.api;
+
+// ---------------------------------------------------------------------------
+// CUDA Buffer Creation Request
+// ---------------------------------------------------------------------------
+table CreateCUDABufferRequest {
+  size: uint64;
+  option_type: ExpirationOption (required);
+}
+
+// ---------------------------------------------------------------------------
+// CUDA Buffer Retrieval Request
+// ---------------------------------------------------------------------------
+table GetCUDABufferRequest {
+  buffer_id: UUID;
+}
+
+// ---------------------------------------------------------------------------
+// Notify Buffer Usage Completion Request
+// ---------------------------------------------------------------------------
+table NotifyDoneRequest {
+  buffer_id: UUID;
+}
+
+// ---------------------------------------------------------------------------
+// Union of all possible RPC request types
+// ---------------------------------------------------------------------------
+union RPCRequest {
+  CreateCUDABufferRequest,
+  GetCUDABufferRequest,
+  NotifyDoneRequest
+}
+
+// ---------------------------------------------------------------------------
+// Root type for RPC request messages
+// ---------------------------------------------------------------------------
+table RPCRequestMessage {
+  request: RPCRequest (required);
+}
+root_type RPCRequestMessage;

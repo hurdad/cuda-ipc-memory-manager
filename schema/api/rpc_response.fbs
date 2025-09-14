@@ -1,0 +1,52 @@
+// ============================================================================
+// File: rpc_response.fbs
+// Namespace: fbs.cuda.ipc.api
+// ---------------------------------------------------------------------------
+// RPC Response tables for CUDA IPC, using common definitions.
+// ============================================================================
+
+include "common.fbs";
+
+namespace fbs.cuda.ipc.api;
+
+// ---------------------------------------------------------------------------
+// Response for buffer creation
+// ---------------------------------------------------------------------------
+table CreateCUDABufferResponse {
+  buffer_id: UUID;
+  ipc_handle: CudaIPCHandle;
+  success: bool;
+  error: string;
+}
+
+// ---------------------------------------------------------------------------
+// Response for buffer retrieval
+// ---------------------------------------------------------------------------
+table GetCUDABufferResponse {
+  ipc_handle: CudaIPCHandle;
+  size: uint64;
+}
+
+// ---------------------------------------------------------------------------
+// Response for notify done
+// ---------------------------------------------------------------------------
+table NotifyDoneResponse {
+  success: bool;
+}
+
+// ---------------------------------------------------------------------------
+// Union of all possible RPC response types
+// ---------------------------------------------------------------------------
+union RPCResponse {
+  CreateCUDABufferResponse,
+  GetCUDABufferResponse,
+  NotifyDoneResponse
+}
+
+// ---------------------------------------------------------------------------
+// Root type for RPC response messages
+// ---------------------------------------------------------------------------
+table RPCResponseMessage {
+  response: RPCResponse (required);
+}
+root_type RPCResponseMessage;

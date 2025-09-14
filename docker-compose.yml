@@ -2,7 +2,7 @@ services:
 
   cuda-ipc-memory-manager-service:
     build: .
-    runtime: nvidia
+    #runtime: nvidia
     network_mode: host
     restart: unless-stopped
     environment:
@@ -14,7 +14,7 @@ services:
     volumes:
       - zmq_ipc_socket:/var/run/
     privileged: true
-    command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/conf.tpl" ]
+    command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/config.tpl" ]
 
 volumes:
   zmq_ipc_socket:

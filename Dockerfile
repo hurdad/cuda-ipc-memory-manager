@@ -15,6 +15,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libflatbuffers-dev \
     libboost-all-dev \
     libspdlog-dev \
+    cppzmq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir
@@ -38,6 +39,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libspdlog1.12 \
     libflatbuffers2 \
     libboost-program-options1.83.0 \
+    libzmq5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

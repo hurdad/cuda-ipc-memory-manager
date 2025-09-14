@@ -1,0 +1,44 @@
+// ============================================================================
+// File: common.fbs
+// Namespace: fbs.cuda.ipc.api
+// ---------------------------------------------------------------------------
+// Common FlatBuffers definitions shared across CUDA IPC requests and responses.
+// ============================================================================
+
+namespace fbs.cuda.ipc.api;
+
+// ---------------------------------------------------------------------------
+// UUID Representation (Struct)
+// 128-bit unique identifier
+// ---------------------------------------------------------------------------
+struct UUID {
+  msb: uint64;
+  lsb: uint64;
+}
+
+// ---------------------------------------------------------------------------
+// CUDA IPC Handle Representation (Struct)
+// 64-bit binary handle used for CUDA inter-process communication
+// ---------------------------------------------------------------------------
+struct CudaIPCHandle {
+  value: [ubyte:8]; // 8-byte binary handle
+}
+
+// ---------------------------------------------------------------------------
+// Expiration Options (Structs)
+// ---------------------------------------------------------------------------
+struct ReaderCountOption {
+  reader_count: uint64;
+}
+
+struct TtlOption {
+  ttl: uint64;
+}
+
+// ---------------------------------------------------------------------------
+// Union for expiration strategy
+// ---------------------------------------------------------------------------
+union ExpirationOption {
+  ReaderCountOption,
+  TtlOption
+}
