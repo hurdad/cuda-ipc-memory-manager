@@ -111,7 +111,6 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 }
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-
   // convert flatbuffers uuid to boost uuid
   auto uuid = util::UUIDConverter::toBoostUUID(*req->buffer_id());
 
@@ -145,9 +144,9 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 
 void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
   auto uuid    = util::UUIDConverter::toBoostUUID(*req->buffer_id());
-  bool success = buffers_.erase(uuid) > 0;
+  //bool success = buffers_.erase(uuid) > 0;
 
-  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponse(builder, success);
+  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponse(builder, true);
   auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
   builder.Finish(msg);
 }

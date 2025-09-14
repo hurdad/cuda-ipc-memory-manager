@@ -66,7 +66,7 @@ private:
   void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder);
   void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder);
 
-  boost::uuids::uuid generateUUID();
+  static boost::uuids::uuid generateUUID();
 };
 
 #endif // CUDA_UTILS_H
