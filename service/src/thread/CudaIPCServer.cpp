@@ -12,13 +12,18 @@ CudaIPCServer::CudaIPCServer(const std::string& endpoint)
 }
 
 CudaIPCServer::~CudaIPCServer() {
-  if (thread_.joinable())
-    thread_.join();
+  if (server_thread_.joinable())
+    server_thread_.join();
+  if (expiration_thread_.joinable())
+    expiration_thread_.join();
 }
 
 void CudaIPCServer::start() {
-  running_ = true;
-  thread_  = std::thread(&CudaIPCServer::run, this);
+  running_       = true;
+  server_thread_ = std::thread(&CudaIPCServer::run, this);
+
+  // Start expiration cleanup thread
+  expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
 }
 
 void CudaIPCServer::stop() {
@@ -26,8 +31,10 @@ void CudaIPCServer::stop() {
 }
 
 void CudaIPCServer::join() {
-  if (thread_.joinable())
-    thread_.join();
+  if (server_thread_.joinable())
+    server_thread_.join();
+  if (expiration_thread_.joinable())
+    expiration_thread_.join();
 }
 
 void CudaIPCServer::run() {
@@ -70,6 +77,8 @@ void CudaIPCServer::run() {
 }
 
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
+
   // init flatbuffers response
   auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
 
@@ -124,6 +133,8 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 }
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
+
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
 
@@ -158,6 +169,8 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 }
 
 void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
+
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
 
@@ -195,16 +208,56 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   gpu_buffer_entry.access_counter--;
 
   // Delete the GPU buffer if it has no remaining accessors and expiration is ACCESS-based
-  if (gpu_buffer_entry.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS &&
-      gpu_buffer_entry.access_counter == 0 &&
-      gpu_buffer_entry.access_ids.empty()) {
-    CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
-    buffers_.erase(buffer_id);
-  }
+  // if (gpu_buffer_entry.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS &&
+  //     gpu_buffer_entry.access_counter == 0 &&
+  //     gpu_buffer_entry.access_ids.empty()) {
+  //   CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
+  //   buffers_.erase(buffer_id);
+  // }
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {
   // static ensures the generator is constructed only once
   static boost::uuids::random_generator gen;
   return gen();
+}
+
+void CudaIPCServer::expirationLoop() {
+  using namespace std::chrono_literals;
+  while (running_) {
+    cleanupExpiredBuffers();
+    std::this_thread::sleep_for(5s); // Run every second
+  }
+}
+
+void CudaIPCServer::cleanupExpiredBuffers() {
+  spdlog::trace("cleanupExpiredBuffers");
+  auto                        now = std::chrono::steady_clock::now();
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
+
+  for (auto it = buffers_.begin(); it != buffers_.end();) {
+    auto& record = it->second;
+
+    // Example expiration rule:
+    if (record.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_TIMESTAMP) {
+      if (now >= record.expiration_timestamp) {
+        spdlog::info("Buffer expired. Releasing GPU memory.");
+
+        // Free CUDA memory
+        CudaUtils::FreeDeviceBuffer(record.d_ptr);
+
+        it = buffers_.erase(it);
+      }
+    } else if (record.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS) {
+      if (record.access_counter == 0) {
+        spdlog::info("Buffer expired due to zero access count.");
+
+        // Free CUDA memory
+        CudaUtils::FreeDeviceBuffer(record.d_ptr);
+        it = buffers_.erase(it);
+      }
+    }
+
+    ++it;
+  }
 }
