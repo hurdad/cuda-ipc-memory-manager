@@ -15,5 +15,16 @@ services:
     privileged: true
     command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/config.tpl" ]
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+
 volumes:
   zmq_ipc_socket:
+  prometheus_data:
