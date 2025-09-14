@@ -1,0 +1,9 @@
+namespace fbs.cuda.ipc.service;
+
+table Configuration {
+  gpu_device_index: uint8;
+  zmq_router_endpoint: string;
+  prometheus_endpoint: string;
+}
+
+root_type Configuration;

@@ -1,0 +1,12 @@
+
+
+#ifndef CUDA_IPC_MEMORY_MANAGER_API_H
+#define CUDA_IPC_MEMORY_MANAGER_API_H
+
+
+class API
+{
+};
+
+
+#endif //CUDA_IPC_MEMORY_MANAGER_API_H

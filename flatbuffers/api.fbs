@@ -1,0 +1,43 @@
+namespace fbs.cuda.ipc.api;
+
+table GetBufferRequest {
+  buffer_id:string;
+}
+
+table GetBufferResponse {
+  ipc_handle:string;
+  size:ulong;
+}
+
+table NotifyDoneRequest {
+  buffer_id:string;
+  worker_id:string;
+}
+
+table NotifyDoneResponse {
+  success:bool;
+}
+
+table CreateBufferRequest {
+  buffer_id:string;
+  size:ulong;
+}
+
+table CreateBufferResponse {
+  success:bool;
+  error:string;
+}
+
+// Union for different RPC requests
+union RPCRequest { GetBufferRequest, NotifyDoneRequest, CreateBufferRequest }
+
+// Union for different RPC responses
+union RPCResponse { GetBufferResponse, NotifyDoneResponse, CreateBufferResponse }
+
+table Envelope {
+  rpc_type:string;
+  request:RPCRequest;
+  response:RPCResponse;
+}
+
+root_type Envelope;
