@@ -9,6 +9,12 @@
 #include <zmq.hpp>
 #include <spdlog/spdlog.h>
 
+// Prometheus Metrics
+#include <prometheus/counter.h>
+#include <prometheus/histogram.h>
+#include <prometheus/exposer.h>
+#include <prometheus/registry.h>
+
 // Boost UUID
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -24,7 +30,6 @@
 #include "service_generated.h"
 #include "api/rpc_request_generated.h"
 #include "api/rpc_response_generated.h"
-
 
 struct GPUBufferRecord {
   // GPU Buffer ID
@@ -90,6 +95,19 @@ private:
   void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder);
 
   static boost::uuids::uuid generateUUID();
+
+  // Prometheus metrics
+  std::shared_ptr<prometheus::Registry> registry_;
+  std::unique_ptr<prometheus::Exposer>  exposer_;
+  prometheus::Counter*                  requests_total_;
+  prometheus::Counter*                  create_buffer_success_;
+  prometheus::Counter*                  create_buffer_fail_;
+  prometheus::Gauge*                    allocated_buffers_;
+  prometheus::Gauge*                    allocated_bytes_;
+  prometheus::Counter*                  expired_buffers_;
+  prometheus::Histogram*                create_buffer_latency_;
+  prometheus::Histogram*                get_buffer_latency_;
+  prometheus::Histogram*                notify_done_latency_;
 };
 
 #endif // CUDA_UTILS_H

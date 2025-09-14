@@ -5,9 +5,86 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
     context_(1),
     socket_(context_, zmq::socket_type::rep),
     running_(false) {
-
   // Init GPU Device
-  CudaUtils::InitDevice(configuration->gpu_device_index());
+  //CudaUtils::InitDevice(configuration->gpu_device_index());
+
+  // create an http server for Prometheus metrics
+  exposer_ = std::make_unique<prometheus::Exposer>(configuration->prometheus_endpoint()->str());
+
+  // create a metrics registry
+  registry_ = std::make_shared<prometheus::Registry>();
+
+  // Define metrics
+  requests_total_ = &prometheus::BuildCounter()
+                     .Name("cuda_ipc_requests_total")
+                     .Help("Total number of IPC requests received")
+                     .Register(*registry_)
+                     .Add({});
+
+  create_buffer_success_ = &prometheus::BuildCounter()
+                            .Name("cuda_ipc_create_buffer_success_total")
+                            .Help("Number of successfully created GPU buffers")
+                            .Register(*registry_)
+                            .Add({});
+
+  create_buffer_fail_ = &prometheus::BuildCounter()
+                         .Name("cuda_ipc_create_buffer_fail_total")
+                         .Help("Number of failed GPU buffer creation attempts")
+                         .Register(*registry_)
+                         .Add({});
+
+  allocated_buffers_ = &prometheus::BuildGauge()
+                        .Name("cuda_ipc_allocated_buffers")
+                        .Help("Current number of allocated GPU buffers")
+                        .Register(*registry_)
+                        .Add({});
+
+  allocated_bytes_ = &prometheus::BuildGauge()
+                      .Name("cuda_ipc_allocated_bytes")
+                      .Help("Total GPU memory allocated in bytes")
+                      .Register(*registry_)
+                      .Add({});
+
+  expired_buffers_ = &prometheus::BuildCounter()
+                      .Name("cuda_ipc_expired_buffers_total")
+                      .Help("Number of GPU buffers that have expired")
+                      .Register(*registry_)
+                      .Add({});
+
+  // Histogram buckets (in seconds)
+  std::vector<double> latency_buckets{
+      1e-9, // 1 ns
+      10e-9, // 10 ns
+      100e-9, // 100 ns
+      1e-6, // 1 μs
+      10e-6, // 10 μs
+      100e-6, // 100 μs
+      1e-3, // 1 ms
+      10e-3, // 10 ms
+      0.1, // 100 ms
+      1.0 // 1 s
+  };
+
+  create_buffer_latency_ = &prometheus::BuildHistogram()
+                            .Name("cuda_ipc_create_buffer_latency_seconds")
+                            .Help("Latency of CreateBuffer requests in seconds")
+                            .Register(*registry_)
+                            .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+
+  get_buffer_latency_ = &prometheus::BuildHistogram()
+                         .Name("cuda_ipc_get_buffer_latency_seconds")
+                         .Help("Latency of GetBuffer requests in seconds")
+                         .Register(*registry_)
+                         .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+
+  notify_done_latency_ = &prometheus::BuildHistogram()
+                          .Name("cuda_ipc_notify_done_latency_seconds")
+                          .Help("Latency of NotifyDone requests in seconds")
+                          .Register(*registry_)
+                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+
+  // Register the registry with exposer
+  exposer_->RegisterCollectable(registry_);
 
   // bind zmq req socket
   socket_.bind(configuration->zmq_request_endpoint()->str());
@@ -26,7 +103,7 @@ CudaIPCServer::~CudaIPCServer() {
 }
 
 void CudaIPCServer::start() {
-  running_       = true;
+  running_ = true;
 
   // Start server zmq server thread
   server_thread_ = std::thread(&CudaIPCServer::run, this);
@@ -165,7 +242,7 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 
   // get buffer entry in hashmap
   GPUBufferRecord gpu_buffer_entry = it->second;
-  auto access_id = rand();
+  auto            access_id        = rand();
   gpu_buffer_entry.access_ids.push_back(access_id); // save access id
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 

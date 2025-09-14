@@ -16,6 +16,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libboost-program-options1.83-dev \
     libspdlog-dev \
     cppzmq-dev \
+    libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir
