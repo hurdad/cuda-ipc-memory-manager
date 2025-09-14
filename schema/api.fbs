@@ -81,9 +81,11 @@ table NotifyDoneResponse {
   success: bool; // True if notification was successful
 }
 
-// ============================================================================
+// ---------------------------------------------------------------------------
 // RPC Message Wrappers
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Unions of request and response types
+// ---------------------------------------------------------------------------
 union RPCRequest {
   CreateCUDABufferRequest,
   GetCUDABufferRequest,
@@ -95,3 +97,22 @@ union RPCResponse {
   GetCUDABufferResponse,
   NotifyDoneResponse
 }
+
+// ---------------------------------------------------------------------------
+// Root types for serialization
+// ---------------------------------------------------------------------------
+// The tables below are suitable as root types for FlatBuffers.
+// These tables contain the unions, which allow flexible RPC messages.
+// ---------------------------------------------------------------------------
+
+// Root type for sending an RPC request
+table RPCRequestMessage {
+  request: RPCRequest (required);
+}
+root_type RPCRequestMessage;
+
+// Root type for sending an RPC response
+table RPCResponseMessage {
+  response: RPCResponse (required);
+}
+root_type RPCResponseMessage;
