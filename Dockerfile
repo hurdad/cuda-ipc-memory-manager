@@ -3,10 +3,6 @@ FROM nvidia/cuda:12.6.0-devel-ubuntu24.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and install required development packages
-RUN apt update && apt install -y ca-certificates software-properties-common
-RUN echo "deb [trusted=yes] https://ubuntu-deb-repo.s3.us-east-2.amazonaws.com noble main" | tee /etc/apt/sources.list.d/ubuntu-deb-repo.list > /dev/null
-
 # Install build dependencies
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     build-essential \
@@ -17,6 +13,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libspdlog-dev \
     cppzmq-dev \
     libcurl4-openssl-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir
