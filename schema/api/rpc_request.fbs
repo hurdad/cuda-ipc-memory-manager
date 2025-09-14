@@ -14,21 +14,23 @@ namespace fbs.cuda.ipc.api;
 // ---------------------------------------------------------------------------
 table CreateCUDABufferRequest {
   size: uint64;
-  expiration: ExpirationOption (required);
+  expiration: ExpirationOption;
 }
 
 // ---------------------------------------------------------------------------
 // CUDA Buffer Retrieval Request
 // ---------------------------------------------------------------------------
 table GetCUDABufferRequest {
-  buffer_id: UUID;
+  buffer_id: UUID (required);
+  access_id: uint32;
 }
 
 // ---------------------------------------------------------------------------
 // Notify Buffer Usage Completion Request
 // ---------------------------------------------------------------------------
 table NotifyDoneRequest {
-  buffer_id: UUID;
+  buffer_id: UUID (required);
+  access_id: uint32;
 }
 
 // ---------------------------------------------------------------------------

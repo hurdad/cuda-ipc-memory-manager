@@ -15,6 +15,7 @@ namespace fbs.cuda.ipc.api;
 table CreateCUDABufferResponse {
   buffer_id: UUID;
   ipc_handle: CudaIPCHandle;
+  access_id: uint32;
   success: bool;
   error: string;
 }
@@ -34,6 +35,7 @@ table GetCUDABufferResponse {
 // ---------------------------------------------------------------------------
 table NotifyDoneResponse {
   success: bool;
+  error: string;
 }
 
 // ---------------------------------------------------------------------------

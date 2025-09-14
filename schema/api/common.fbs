@@ -45,8 +45,19 @@ struct TtlLastActivityOption {
 // ---------------------------------------------------------------------------
 // Union for expiration strategy
 // ---------------------------------------------------------------------------
-union ExpirationOption {
+union ExpirationOptions {
   AccessCountOption,
   TtlCreationOption,
   TtlLastActivityOption
+}
+
+
+enum ExpirationOptionsType : byte {
+  NONE = 0,
+  ACCESS = 1,
+  TIMESTAMP = 2,
+}
+
+table ExpirationOption {
+  option : ExpirationOptions (required);
 }

@@ -73,11 +73,12 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   // init flatbuffers response
   auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
 
-  // generate uuid
-  auto uuid = generateUUID();
+  // generate ids
+  auto buffer_id = generateUUID();
+  auto access_id = rand();
 
   // convert to uuid flatbuffer
-  auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(uuid);
+  auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(buffer_id);
 
   // save to response
   resp.add_buffer_id(&uuid_flatbuffer);
@@ -88,12 +89,24 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
     // create entry and save device pointer, size and handle
     GPUBufferRecord entry;
+    entry.uuid       = buffer_id;
     entry.d_ptr      = d_ptr;
     entry.size       = req->size();
     entry.ipc_handle = cuda_memory_handle;
+    entry.access_ids.push_back(access_id);
+    entry.creation_timestamp      = std::chrono::steady_clock::now();
+    entry.last_activity_timestamp = std::chrono::steady_clock::now();
+
+    if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
+      entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->option_as_TtlCreationOption()->ttl());
+    }
+
+    if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
+      entry.access_counter = req->expiration()->option_as_AccessCountOption()->aceess_count();
+    }
 
     // add entry to buffers_ hash map
-    buffers_[uuid] = entry;
+    buffers_[buffer_id] = entry;
 
     // save ipc handle to response
     resp.add_ipc_handle(&cuda_memory_handle);
@@ -112,10 +125,10 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
   // convert flatbuffers uuid to boost uuid
-  auto uuid = util::UUIDConverter::toBoostUUID(*req->buffer_id());
+  auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
 
-  // search for buffer by boost uuid
-  auto it = buffers_.find(uuid);
+  // search for buffer by buffer_id uuid
+  auto it = buffers_.find(buffer_id);
   if (it == buffers_.end()) {
     spdlog::warn("Buffer not found");
 
@@ -132,8 +145,10 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 
   // get buffer entry in hashmap
   GPUBufferRecord gpu_buffer_entry = it->second;
+  gpu_buffer_entry.access_ids.push_back(req->access_id()); // save access id
+  gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
-  // init flatbuffers successresponse
+  // init flatbuffers success response
   auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
                                                                &gpu_buffer_entry.ipc_handle,
                                                                it->second.size,
@@ -143,12 +158,49 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 }
 
 void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-  auto uuid    = util::UUIDConverter::toBoostUUID(*req->buffer_id());
-  //bool success = buffers_.erase(uuid) > 0;
+  // convert flatbuffers uuid to boost uuid
+  auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
 
-  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponse(builder, true);
-  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
-  builder.Finish(msg);
+  // search for buffer by boost uuid
+  auto it = buffers_.find(buffer_id);
+  if (it == buffers_.end()) {
+    spdlog::warn("Buffer not found");
+
+    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+    builder.Finish(msg);
+    return;
+  }
+
+  // get buffer entry in hashmap
+  GPUBufferRecord gpu_buffer_entry = it->second;
+
+  auto it2 = std::find(gpu_buffer_entry.access_ids.begin(), gpu_buffer_entry.access_ids.end(), req->access_id());
+  if (it2 == gpu_buffer_entry.access_ids.end()) {
+    spdlog::warn("Access ID not found");
+
+    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Acceess ID not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+    builder.Finish(msg);
+    return;
+  }
+
+  // remove access id
+  gpu_buffer_entry.access_ids.erase(it2);
+
+  // update last activity timestamp
+  gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now();
+
+  // decrement access counter
+  gpu_buffer_entry.access_counter--;
+
+  // Delete the GPU buffer if it has no remaining accessors and expiration is ACCESS-based
+  if (gpu_buffer_entry.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS &&
+      gpu_buffer_entry.access_counter == 0 &&
+      gpu_buffer_entry.access_ids.empty()) {
+    CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
+    buffers_.erase(buffer_id);
+  }
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {
