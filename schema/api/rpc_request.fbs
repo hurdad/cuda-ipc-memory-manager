@@ -22,7 +22,6 @@ table CreateCUDABufferRequest {
 // ---------------------------------------------------------------------------
 table GetCUDABufferRequest {
   buffer_id: UUID (required);
-  access_id: uint32;
 }
 
 // ---------------------------------------------------------------------------

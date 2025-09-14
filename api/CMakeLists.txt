@@ -1,9 +1,15 @@
 find_package(spdlog REQUIRED)
+find_package(Boost REQUIRED)
 
 add_library(cuda-ipc-memory-manager-api STATIC
-        API.cpp
-       API.h
+        CudaIpcMemoryRequestAPI.h
+        CudaIpcMemoryRequestAPI.cpp
+        CudaUtils.cu
+        CudaUtils.h
+        UUIDConverter.hpp
 )
 
-target_include_directories(cuda-ipc-memory-manager-api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(cuda-ipc-memory-manager-api PUBLIC etcd flatbuffers_generated spdlog::spdlog)
+target_link_libraries(cuda-ipc-memory-manager-api PUBLIC
+        flatbuffers_generated
+        zmq
+        spdlog::spdlog)

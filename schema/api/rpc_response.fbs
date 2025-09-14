@@ -26,6 +26,7 @@ table CreateCUDABufferResponse {
 table GetCUDABufferResponse {
   ipc_handle: CudaIPCHandle;
   size: uint64;
+  access_id: uint32;
   success: bool;
   error: string;
 }

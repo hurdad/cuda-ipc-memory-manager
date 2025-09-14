@@ -156,7 +156,8 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 
   // get buffer entry in hashmap
   GPUBufferRecord gpu_buffer_entry = it->second;
-  gpu_buffer_entry.access_ids.push_back(req->access_id()); // save access id
+  auto access_id = rand();
+  gpu_buffer_entry.access_ids.push_back(access_id); // save access id
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
   // init flatbuffers success response
