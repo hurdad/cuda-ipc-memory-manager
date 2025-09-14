@@ -4,12 +4,10 @@ find_package(Boost REQUIRED)
 add_library(cuda-ipc-memory-manager-api STATIC
         CudaIpcMemoryRequestAPI.h
         CudaIpcMemoryRequestAPI.cpp
-        CudaUtils.cu
-        CudaUtils.h
-        UUIDConverter.hpp
 )
 
 target_link_libraries(cuda-ipc-memory-manager-api PUBLIC
+        cuda-util
         flatbuffers_generated
         zmq
         spdlog::spdlog)

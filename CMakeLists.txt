@@ -6,6 +6,7 @@ set(CMAKE_CUDA_ARCHITECTURES 86)
 project(cuda-ipc-memory-manager LANGUAGES CXX CUDA)
 
 add_subdirectory(schema)
+add_subdirectory(util)
 add_subdirectory(api)
 add_subdirectory(service)
 
