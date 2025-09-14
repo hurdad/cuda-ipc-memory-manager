@@ -26,7 +26,7 @@
 
 
 struct GPUBufferEntry {
-  // CUDA IPC handle for sharing GPU memory across processes
+  // CUDA IPC handle for sharing GPU memory across processes (flatbuffers)
   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
 
   // Device pointer to the GPU memory

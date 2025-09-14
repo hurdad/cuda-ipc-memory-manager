@@ -70,45 +70,76 @@ void CudaIPCServer::run() {
 }
 
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  // init flatbuffers response
   auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
 
+  // generate uuid
+  auto uuid = generateUUID();
+
+  // convert to uuid flatbuffer
+  auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(uuid);
+
+  // save to response
+  resp.add_buffer_id(&uuid_flatbuffer);
   try {
+    // allocate device buffer and get handle
     auto d_ptr              = CudaUtils::AllocDeviceBuffer(req->size());
     auto cuda_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
 
-    auto           uuid = generateUUID();
+    // create entry and save device pointer, size and handle
     GPUBufferEntry entry;
     entry.d_ptr      = d_ptr;
     entry.size       = req->size();
     entry.ipc_handle = cuda_memory_handle;
-    buffers_[uuid]   = entry;
 
-    auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(uuid);
-    resp.add_buffer_id(&uuid_flatbuffer);
+    // add entry to buffers_ hash map
+    buffers_[uuid] = entry;
+
+    // save ipc handle to response
     resp.add_ipc_handle(&cuda_memory_handle);
     resp.add_success(true);
   } catch (const std::exception& e) {
     resp.add_success(false);
   }
 
+  // finish up response message
   auto resp_offset = resp.Finish();
-  auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder,
+  auto msg         = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder,
                                                            fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse,
                                                            resp_offset.o);
   builder.Finish(msg);
 }
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+
+  // convert flatbuffers uuid to boost uuid
   auto uuid = util::UUIDConverter::toBoostUUID(*req->buffer_id());
-  auto it   = buffers_.find(uuid);
+
+  // search for buffer by boost uuid
+  auto it = buffers_.find(uuid);
   if (it == buffers_.end()) {
-    //std::cerr << "Buffer not found: " << uuid << std::endl;
+    spdlog::warn("Buffer not found");
+
+    // return error
+    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder,
+                                                                       nullptr,
+                                                                       it->second.size,
+                                                                       false,
+                                                                       "Buffer not found");
+    auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+    builder.Finish(msg);
     return;
   }
 
-  auto handle_struct = fbs::cuda::ipc::api::CudaIPCHandle();
-  auto resp          = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &handle_struct, it->second.size);
-  auto msg           = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+  // get buffer entry in hashmap
+  GPUBufferEntry gpu_buffer_entry = it->second;
+
+  // init flatbuffers successresponse
+  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
+                                                               &gpu_buffer_entry.ipc_handle,
+                                                               it->second.size,
+                                                               true);
+  auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
   builder.Finish(msg);
 }
 
