@@ -14,7 +14,7 @@ namespace fbs.cuda.ipc.api;
 // ---------------------------------------------------------------------------
 table CreateCUDABufferRequest {
   size: uint64;
-  option_type: ExpirationOption (required);
+  expiration: ExpirationOption (required);
 }
 
 // ---------------------------------------------------------------------------

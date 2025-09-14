@@ -15,24 +15,23 @@ struct UUID {
   msb: uint64;
   lsb: uint64;
 }
-
 // ---------------------------------------------------------------------------
-// CUDA IPC Handle Representation (Struct)
-// 64-bit binary handle used for CUDA inter-process communication
+// CUDA IPC Handle [cudaIpcMemHandle_t] Representation (FlatBuffers)
+// 64-byte binary handle used for CUDA inter-process communication
 // ---------------------------------------------------------------------------
 struct CudaIPCHandle {
-  value: [ubyte:8]; // 8-byte binary handle
+  value: [ubyte:64];  // 64-byte binary handle
 }
 
 // ---------------------------------------------------------------------------
 // Expiration Options (Structs)
 // ---------------------------------------------------------------------------
 struct ReaderCountOption {
-  reader_count: uint64;
+  reader_count: uint64; // expected reader count
 }
 
 struct TtlOption {
-  ttl: uint64;
+  ttl: uint64; // seconds
 }
 
 // ---------------------------------------------------------------------------

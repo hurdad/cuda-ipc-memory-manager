@@ -8,6 +8,8 @@ add_executable(cuda-ipc-memory-manager-service
         src/thread/CudaIPCServer.h
         src/thread/CudaIPCServer.h
         src/thread/UUIDConverter.hpp
+        src/thread/CudaUtils.cu
+        src/thread/CudaUtils.h
 )
 
 target_link_libraries(cuda-ipc-memory-manager-service PRIVATE

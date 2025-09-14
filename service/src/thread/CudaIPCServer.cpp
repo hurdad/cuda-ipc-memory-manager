@@ -1,7 +1,5 @@
 #include "CudaIPCServer.h"
 
-#include <spdlog/spdlog.h>
-
 CudaIPCServer::CudaIPCServer(const std::string& endpoint)
   : context_(1),
     socket_(context_, zmq::socket_type::rep),
@@ -68,26 +66,33 @@ void CudaIPCServer::run() {
 }
 
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-  auto        uuid = generateUUID();
-  BufferEntry entry;
-  entry.size       = req->size();
-  entry.ipc_handle = std::vector<uint8_t>(8, 42); // dummy 8-byte handle
-  buffers_[uuid]   = entry;
+  auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
 
-  auto uuid_struct   = fbs::cuda::ipc::api::UUID(0, 0);
-  auto handle_struct = fbs::cuda::ipc::api::CudaIPCHandle();
-  auto resp          = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
-  resp.add_buffer_id(&uuid_struct);
-  resp.add_ipc_handle(&handle_struct);
-  resp.add_success(true);
+  try {
+    auto d_ptr              = CudaUtils::AllocDeviceBuffer(req->size());
+    auto cuda_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
+
+    auto           uuid = generateUUID();
+    GPUBufferEntry entry;
+    entry.d_ptr      = d_ptr;
+    entry.size       = req->size();
+    entry.ipc_handle = cuda_memory_handle;
+    buffers_[uuid]   = entry;
+
+    auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(uuid);
+    resp.add_buffer_id(&uuid_flatbuffer);
+    resp.add_ipc_handle(&cuda_memory_handle);
+    resp.add_success(true);
+  } catch (const std::exception& e) {
+    resp.add_success(false);
+  }
+
   auto resp_offset = resp.Finish();
-
-  // auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder,
-  //   fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse,
-  //   resp_offset);
-  // builder.Finish(msg);
-  //
-  // socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder,
+                                                           fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse,
+                                                           resp_offset.o);
+  builder.Finish(msg);
+  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
 }
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
@@ -99,22 +104,22 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   }
 
   auto handle_struct = fbs::cuda::ipc::api::CudaIPCHandle();
-  // auto resp          = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, handle_struct, it->second.size);
-  // auto msg           = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp);
-  // builder.Finish(msg);
-  //
-  // socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto resp          = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &handle_struct, it->second.size);
+  auto msg           = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+  builder.Finish(msg);
+
+  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
 }
 
 void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
   auto uuid    = util::UUIDConverter::toBoostUUID(*req->buffer_id());
   bool success = buffers_.erase(uuid) > 0;
 
-  // auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponse(builder, success);
-  // auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp);
-  // builder.Finish(msg);
-  //
-  // socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponse(builder, success);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+  builder.Finish(msg);
+
+  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {
