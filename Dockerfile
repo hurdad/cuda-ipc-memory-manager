@@ -13,7 +13,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     cmake \
     flatbuffers-compiler \
     libflatbuffers-dev \
-    libboost-all-dev \
+    libboost-program-options1.83-dev \
     libspdlog-dev \
     cppzmq-dev \
     && rm -rf /var/lib/apt/lists/*

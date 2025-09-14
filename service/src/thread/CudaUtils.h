@@ -54,4 +54,3 @@ public:
 };
 
 #endif // CUDA_UTILS_H
-
