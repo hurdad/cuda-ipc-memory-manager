@@ -25,9 +25,15 @@
 #include "api/rpc_response_generated.h"
 
 
-struct GPUBufferEntry {
+struct GPUBufferRecord {
+  // GPU Buffer ID
+  boost::uuids::uuid uuid;
+
   // CUDA IPC handle for sharing GPU memory across processes (flatbuffers)
   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
+
+  // How to handle expiration of this buffer
+  fbs::cuda::ipc::api::ExpirationOption expiration_option;
 
   // Device pointer to the GPU memory
   void* d_ptr = nullptr;
@@ -35,11 +41,14 @@ struct GPUBufferEntry {
   // Size of the buffer in bytes
   size_t size = 0;
 
-  // Number of active readers using this buffer
-  size_t reader_counter = 0;
+  // Number of access counts
+  size_t access_counter = 0;
+
+  // Creation Timestamp of the buffer
+  std::chrono::steady_clock::time_point creation_timestamp;
 
   // Timestamp of the last activity on this buffer
-  std::chrono::steady_clock::time_point last_activity;
+  std::chrono::steady_clock::time_point last_activity_timestamp;
 };
 
 class CudaIPCServer {
@@ -57,7 +66,7 @@ private:
   std::thread                                                                             thread_;
   std::string                                                                             endpoint_;
   std::atomic<bool>                                                                       running_; // stop flag
-  std::unordered_map<boost::uuids::uuid, GPUBufferEntry, boost::hash<boost::uuids::uuid>> buffers_;
+  std::unordered_map<boost::uuids::uuid, GPUBufferRecord, boost::hash<boost::uuids::uuid>> buffers_;
 
   void run();
 

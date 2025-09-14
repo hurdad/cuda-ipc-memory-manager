@@ -15,6 +15,7 @@ struct UUID {
   msb: uint64;
   lsb: uint64;
 }
+
 // ---------------------------------------------------------------------------
 // CUDA IPC Handle [cudaIpcMemHandle_t] Representation (FlatBuffers)
 // 64-byte binary handle used for CUDA inter-process communication
@@ -26,11 +27,18 @@ struct CudaIPCHandle {
 // ---------------------------------------------------------------------------
 // Expiration Options (Structs)
 // ---------------------------------------------------------------------------
-struct ReaderCountOption {
-  reader_count: uint64; // expected reader count
+// expire gpu buffer when access counter is reached (includes CreateGPUBuffer)
+struct AccessCountOption {
+  aceess_count: uint64;
 }
 
-struct TtlOption {
+// expire gpu buffer based on creation timestamp has reached ttl
+struct TtlCreationOption {
+  ttl: uint64; // seconds
+}
+
+// expire buffer based on last activity timestamp has reached ttl
+struct TtlLastActivityOption {
   ttl: uint64; // seconds
 }
 
@@ -38,6 +46,7 @@ struct TtlOption {
 // Union for expiration strategy
 // ---------------------------------------------------------------------------
 union ExpirationOption {
-  ReaderCountOption,
-  TtlOption
+  AccessCountOption,
+  TtlCreationOption,
+  TtlLastActivityOption
 }

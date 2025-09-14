@@ -87,7 +87,7 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
     auto cuda_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
 
     // create entry and save device pointer, size and handle
-    GPUBufferEntry entry;
+    GPUBufferRecord entry;
     entry.d_ptr      = d_ptr;
     entry.size       = req->size();
     entry.ipc_handle = cuda_memory_handle;
@@ -131,7 +131,7 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   }
 
   // get buffer entry in hashmap
-  GPUBufferEntry gpu_buffer_entry = it->second;
+  GPUBufferRecord gpu_buffer_entry = it->second;
 
   // init flatbuffers successresponse
   auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
