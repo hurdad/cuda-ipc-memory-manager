@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.28.3)
 
 project(cuda-ipc-memory-manager LANGUAGES CXX)
 
-add_subdirectory(flatbuffers)
+add_subdirectory(schema)
 add_subdirectory(api)
 add_subdirectory(service)
 

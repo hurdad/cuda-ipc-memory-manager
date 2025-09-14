@@ -1,0 +1,23 @@
+// ============================================================================
+// File: service.fbs
+// Namespace: fbs.cuda.ipc.service
+// ---------------------------------------------------------------------------
+// FlatBuffers schema defining the configuration for the CUDA Inter-Process Communication (IPC) Memory Manager Service.
+// Includes GPU device selection and endpoints for ZeroMQ and Prometheus.
+// ============================================================================
+
+namespace fbs.cuda.ipc.service;
+
+// ---------------------------------------------------------------------------
+// Service Configuration
+// ---------------------------------------------------------------------------
+// Contains parameters required to initialize and run the CUDA IPC service.
+// ---------------------------------------------------------------------------
+table Configuration {
+  gpu_device_index: uint8;      // Index of the GPU device to use
+  zmq_router_endpoint: string;  // ZeroMQ ROUTER endpoint for IPC communication
+  prometheus_endpoint: string;  // HTTP endpoint for Prometheus metrics
+}
+
+// Specify the root type of the FlatBuffer.
+root_type Configuration;

@@ -1,0 +1,97 @@
+// ============================================================================
+// File: api.fbs
+// Namespace: fbs.cuda.ipc.api
+// FlatBuffers schema for CUDA Inter-Process Communication (IPC) Memory Manager API
+// ----------------------------------------------------------------------------
+// Optimized for compact binary representation and zero-copy serialization.
+// ============================================================================
+
+namespace fbs.cuda.ipc.api;
+
+// ============================================================================
+// UUID Representation (Struct)
+// ============================================================================
+struct UUID {
+  msb: uint64; // Most Significant Bits
+  lsb: uint64; // Least Significant Bits
+}
+
+// ============================================================================
+// CUDA IPC Handle Representation (Struct)
+// ============================================================================
+// CUDA IPC handles are fixed 64-bit identifiers provided by CUDA runtime.
+// Represented as 8 raw bytes for maximum efficiency and zero allocations.
+// ============================================================================
+struct CudaIPCHandle {
+  value: [ubyte:8]; // 64-bit binary handle
+}
+
+// ============================================================================
+// Expiration Options
+// ============================================================================
+struct ReaderCountOption {
+  reader_count: uint64; // Max readers before buffer expires
+}
+
+struct TtlOption {
+  ttl: uint64; // Time-to-live in milliseconds
+}
+
+// Union representing possible expiration strategies.
+union ExpirationOption {
+  ReaderCountOption,
+  TtlOption
+}
+
+// ============================================================================
+// CUDA Buffer Creation
+// ============================================================================
+table CreateCUDABufferRequest {
+  size: uint64;                  // Size of the buffer in bytes
+  option_type: ExpirationOption (required); // Expiration strategy
+}
+
+table CreateCUDABufferResponse {
+  buffer_id: UUID (required);        // Unique buffer identifier
+  ipc_handle: CudaIPCHandle (required); // Binary CUDA IPC handle
+  success: bool;          // True if buffer creation succeeded
+  error: string;          // Error message if success == false
+}
+
+// ============================================================================
+// CUDA Buffer Retrieval
+// ============================================================================
+table GetCUDABufferRequest {
+  buffer_id: UUID(required); // UUID of the buffer to retrieve
+}
+
+table GetCUDABufferResponse {
+  ipc_handle: CudaIPCHandle(required); // Binary CUDA IPC handle
+  size: uint64;              // Size of the buffer in bytes
+}
+
+// ============================================================================
+// Notify Buffer Usage Completion
+// ============================================================================
+table NotifyDoneRequest {
+  buffer_id: UUID(required); // UUID of the buffer being released
+}
+
+table NotifyDoneResponse {
+  success: bool; // True if notification was successful
+}
+
+// ============================================================================
+// RPC Message Wrappers
+// ============================================================================
+union RPCRequest {
+  CreateCUDABufferRequest,
+  GetCUDABufferRequest,
+  NotifyDoneRequest
+}
+
+union RPCResponse {
+  CreateCUDABufferResponse,
+  GetCUDABufferResponse,
+  NotifyDoneResponse
+}
