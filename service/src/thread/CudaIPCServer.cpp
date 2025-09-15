@@ -1,12 +1,9 @@
 #include "CudaIPCServer.h"
 
 CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
-  : configuration_(configuration),
-    context_(1),
-    socket_(context_, zmq::socket_type::rep),
-    running_(false) {
+    : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
   // Init GPU Device
-  //CudaUtils::InitDevice(configuration->gpu_device_index());
+  // CudaUtils::InitDevice(configuration->gpu_device_index());
 
   // create an http server for Prometheus metrics
   exposer_ = std::make_unique<prometheus::Exposer>(configuration->prometheus_endpoint()->str());
@@ -15,73 +12,61 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
   registry_ = std::make_shared<prometheus::Registry>();
 
   // Define metrics
-  requests_total_ = &prometheus::BuildCounter()
-                     .Name("cuda_ipc_requests_total")
-                     .Help("Total number of IPC requests received")
-                     .Register(*registry_)
-                     .Add({});
+  requests_total_ =
+      &prometheus::BuildCounter().Name("cuda_ipc_requests_total").Help("Total number of IPC requests received").Register(*registry_).Add({});
 
   create_buffer_success_ = &prometheus::BuildCounter()
-                            .Name("cuda_ipc_create_buffer_success_total")
-                            .Help("Number of successfully created GPU buffers")
-                            .Register(*registry_)
-                            .Add({});
+                                .Name("cuda_ipc_create_buffer_success_total")
+                                .Help("Number of successfully created GPU buffers")
+                                .Register(*registry_)
+                                .Add({});
 
   create_buffer_fail_ = &prometheus::BuildCounter()
-                         .Name("cuda_ipc_create_buffer_fail_total")
-                         .Help("Number of failed GPU buffer creation attempts")
-                         .Register(*registry_)
-                         .Add({});
+                             .Name("cuda_ipc_create_buffer_fail_total")
+                             .Help("Number of failed GPU buffer creation attempts")
+                             .Register(*registry_)
+                             .Add({});
 
-  allocated_buffers_ = &prometheus::BuildGauge()
-                        .Name("cuda_ipc_allocated_buffers")
-                        .Help("Current number of allocated GPU buffers")
-                        .Register(*registry_)
-                        .Add({});
+  allocated_buffers_ =
+      &prometheus::BuildGauge().Name("cuda_ipc_allocated_buffers").Help("Current number of allocated GPU buffers").Register(*registry_).Add({});
 
-  allocated_bytes_ = &prometheus::BuildGauge()
-                      .Name("cuda_ipc_allocated_bytes")
-                      .Help("Total GPU memory allocated in bytes")
-                      .Register(*registry_)
-                      .Add({});
+  allocated_bytes_ =
+      &prometheus::BuildGauge().Name("cuda_ipc_allocated_bytes").Help("Total GPU memory allocated in bytes").Register(*registry_).Add({});
 
-  expired_buffers_ = &prometheus::BuildCounter()
-                      .Name("cuda_ipc_expired_buffers_total")
-                      .Help("Number of GPU buffers that have expired")
-                      .Register(*registry_)
-                      .Add({});
+  expired_buffers_ =
+      &prometheus::BuildCounter().Name("cuda_ipc_expired_buffers_total").Help("Number of GPU buffers that have expired").Register(*registry_).Add({});
 
   // Histogram buckets (in seconds)
   std::vector<double> latency_buckets{
-      1e-9, // 1 ns
-      10e-9, // 10 ns
+      1e-9,   // 1 ns
+      10e-9,  // 10 ns
       100e-9, // 100 ns
-      1e-6, // 1 μs
-      10e-6, // 10 μs
+      1e-6,   // 1 μs
+      10e-6,  // 10 μs
       100e-6, // 100 μs
-      1e-3, // 1 ms
-      10e-3, // 10 ms
-      0.1, // 100 ms
-      1.0 // 1 s
+      1e-3,   // 1 ms
+      10e-3,  // 10 ms
+      0.1,    // 100 ms
+      1.0     // 1 s
   };
 
   create_buffer_latency_ = &prometheus::BuildHistogram()
-                            .Name("cuda_ipc_create_buffer_latency_seconds")
-                            .Help("Latency of CreateBuffer requests in seconds")
-                            .Register(*registry_)
-                            .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                                .Name("cuda_ipc_create_buffer_latency_seconds")
+                                .Help("Latency of CreateBuffer requests in seconds")
+                                .Register(*registry_)
+                                .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   get_buffer_latency_ = &prometheus::BuildHistogram()
-                         .Name("cuda_ipc_get_buffer_latency_seconds")
-                         .Help("Latency of GetBuffer requests in seconds")
-                         .Register(*registry_)
-                         .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                             .Name("cuda_ipc_get_buffer_latency_seconds")
+                             .Help("Latency of GetBuffer requests in seconds")
+                             .Register(*registry_)
+                             .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   notify_done_latency_ = &prometheus::BuildHistogram()
-                          .Name("cuda_ipc_notify_done_latency_seconds")
-                          .Help("Latency of NotifyDone requests in seconds")
-                          .Register(*registry_)
-                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                              .Name("cuda_ipc_notify_done_latency_seconds")
+                              .Help("Latency of NotifyDone requests in seconds")
+                              .Register(*registry_)
+                              .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
@@ -96,10 +81,8 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 }
 
 CudaIPCServer::~CudaIPCServer() {
-  if (server_thread_.joinable())
-    server_thread_.join();
-  if (expiration_thread_.joinable())
-    expiration_thread_.join();
+  if (server_thread_.joinable()) server_thread_.join();
+  if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::start() {
@@ -117,10 +100,8 @@ void CudaIPCServer::stop() {
 }
 
 void CudaIPCServer::join() {
-  if (server_thread_.joinable())
-    server_thread_.join();
-  if (expiration_thread_.joinable())
-    expiration_thread_.join();
+  if (server_thread_.joinable()) server_thread_.join();
+  if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::run() {
@@ -128,8 +109,7 @@ void CudaIPCServer::run() {
     zmq::message_t request_msg;
     spdlog::trace("Waiting for request...");
     auto recv_result = socket_.recv(request_msg, zmq::recv_flags::none);
-    if (!recv_result)
-      continue;
+    if (!recv_result) continue;
 
     // Increment total requests
     requests_total_->Increment();
@@ -181,6 +161,8 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // save to response
   resp.add_buffer_id(&uuid_flatbuffer);
+  resp.add_access_id(access_id);
+
   try {
     // allocate device buffer and get handle
     auto d_ptr                  = CudaUtils::AllocDeviceBuffer(req->size());
@@ -196,12 +178,14 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
     entry.creation_timestamp      = std::chrono::steady_clock::now();
     entry.last_activity_timestamp = std::chrono::steady_clock::now();
 
-    if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
-      entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->option_as_TtlCreationOption()->ttl());
-    }
+    if (req->expiration()) {
+      if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
+        entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->option_as_TtlCreationOption()->ttl());
+      }
 
-    if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
-      entry.access_counter = req->expiration()->option_as_AccessCountOption()->aceess_count();
+      if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
+        entry.access_counter = req->expiration()->option_as_AccessCountOption()->aceess_count();
+      }
     }
 
     // add entry to buffers_ hash map
@@ -217,15 +201,13 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
     allocated_bytes_->Increment(req->size());
   } catch (const std::exception& e) {
     resp.add_success(false);
-    //resp.add_error()
+    // resp.add_error()
     create_buffer_fail_->Increment();
   }
 
   // finish up response message
   auto resp_offset = resp.Finish();
-  auto msg         = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder,
-                                                           fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse,
-                                                           resp_offset.o);
+  auto msg         = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse, resp_offset.o);
   builder.Finish(msg);
 
   // metrics update
@@ -247,12 +229,8 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
     spdlog::warn("Buffer not found");
 
     // return error
-    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder,
-                                                                       nullptr,
-                                                                       it->second.size,
-                                                                       false,
-                                                                       "Buffer not found");
-    auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder, nullptr, it->second.size, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
     builder.Finish(msg);
 
     auto end = std::chrono::steady_clock::now();
@@ -263,15 +241,12 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   // get buffer entry in hashmap
   GPUBufferRecord gpu_buffer_entry = it->second;
   auto            access_id        = rand();
-  gpu_buffer_entry.access_ids.push_back(access_id); // save access id
+  gpu_buffer_entry.access_ids.push_back(access_id);                            // save access id
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
-                                                               &gpu_buffer_entry.ipc_handle,
-                                                               it->second.size,
-                                                               true);
-  auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &gpu_buffer_entry.ipc_handle, it->second.size, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
   builder.Finish(msg);
 
   // metrics update
