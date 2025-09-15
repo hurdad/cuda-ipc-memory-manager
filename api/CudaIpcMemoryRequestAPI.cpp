@@ -1,14 +1,11 @@
 #include "CudaIpcMemoryRequestAPI.h"
 
+#include "UUIDConverter.hpp"
 #include "api/rpc_request_generated.h"
 #include "api/rpc_response_generated.h"
 
-#include "UUIDConverter.hpp"
-
 namespace cuda::ipc::api {
-CudaIpcMemoryRequestAPI::CudaIpcMemoryRequestAPI(const std::string& endpoint)
-  : context_(1),
-    socket_(context_, zmq::socket_type::req) {
+CudaIpcMemoryRequestAPI::CudaIpcMemoryRequestAPI(const std::string& endpoint) : context_(1), socket_(context_, zmq::socket_type::req) {
   socket_.connect(endpoint);
   spdlog::cfg::load_env_levels();
 }
@@ -21,11 +18,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto                           req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size);
-  auto                           msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(
-      builder,
-      fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest,
-      req.o
-      );
+  auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
 
   // Send request over ZeroMQ
@@ -46,6 +39,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse);
   auto create_response = rpc_response->response_as_CreateCUDABufferResponse();
   if (!create_response) {
     throw std::runtime_error("Invalid CreateCUDABufferResponse in RPC response.");
@@ -53,7 +47,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
 
   // check response success
   if (!create_response->success()) {
-    throw std::runtime_error("Failed to create CUDA buffer : ");// + create_response->error()->str());
+    throw std::runtime_error("Failed to create CUDA buffer : "); // + create_response->error()->str());
   }
 
   auto buffer_id = create_response->buffer_id();
@@ -79,16 +73,12 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
 }
 
 GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
-  //spdlog::info("Getting CUDA buffer = {}", buffer_id.str());
-  // Build FlatBuffer request
+  // spdlog::info("Getting CUDA buffer = {}", buffer_id.str());
+  //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
   auto                           req          = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
-  auto                           msg          = fbs::cuda::ipc::api::CreateRPCRequestMessage(
-      builder,
-      fbs::cuda::ipc::api::RPCRequest_GetCUDABufferRequest,
-      req.o
-      );
+  auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetCUDABufferRequest, req.o);
   builder.Finish(msg);
 
   // Send request over ZeroMQ
@@ -107,6 +97,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse);
   auto get_response = rpc_response->response_as_GetCUDABufferResponse();
   if (!get_response) {
     throw std::runtime_error("Invalid GetCUDABufferResponse in RPC response.");
@@ -123,14 +114,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
   }
 
   auto access_id = get_response->access_id();
-  if (!access_id) {
-    throw std::runtime_error("Received null access_id in response.");
-  }
-
-  auto size = get_response->size();
-  if (!size) {
-    throw std::runtime_error("Received null size in response.");
-  }
+  auto size      = get_response->size();
 
   // get device pointer from ipc_handle
   void* d_ptr = CudaUtils::HandleToCudaMemory(*ipc_handle);
@@ -144,11 +128,7 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
   flatbuffers::FlatBufferBuilder builder;
   auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
   auto                           req          = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
-  auto                           msg          = fbs::cuda::ipc::api::CreateRPCRequestMessage(
-      builder,
-      fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest,
-      req.o
-      );
+  auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest, req.o);
   builder.Finish(msg);
 
   // Send request over ZeroMQ
@@ -167,6 +147,7 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse);
   auto notify_response = rpc_response->response_as_NotifyDoneResponse();
   if (!notify_response) {
     throw std::runtime_error("Invalid NotifyDoneResponse in RPC response.");
@@ -177,4 +158,4 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
     throw std::runtime_error("Failed to notify Done : " + notify_response->error()->str());
   }
 }
-}
+} // namespace cuda::ipc::api

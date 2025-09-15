@@ -18,8 +18,11 @@ int main(int argc, char** argv) {
   boost::uuids::string_generator          gen;
 
   // Parse the string into a boost::uuids::uuid
-  boost::uuids::uuid buffer_id  = gen("8585e8dc-16a7-65ee-66d3-4b95cbc645f5");
+  boost::uuids::uuid buffer_id  = gen("9ed7ae96-10d4-64ab-37e9-b2c784b94c60");
   auto               gpu_buffer = api.GetCUDABufferRequest(buffer_id);
+
+  std::cout << "size : " << gpu_buffer.getSize() << std::endl;
+  std::cout << "access_id : " << gpu_buffer.getAccessId() << std::endl;
 
   // access device pointer as float
   float* d_ptr = (float*)gpu_buffer.getDataPtr();

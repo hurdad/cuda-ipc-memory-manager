@@ -233,7 +233,7 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
     spdlog::warn("Buffer not found");
 
     // return error
-    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder, nullptr, it->second.size, false, "Buffer not found");
+    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder, nullptr, it->second.size, 0, false, "Buffer not found");
     auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
     builder.Finish(msg);
 
@@ -243,13 +243,17 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   }
 
   // get buffer entry in hashmap
-  GPUBufferRecord gpu_buffer_entry = it->second;
+  GPUBufferRecord &gpu_buffer_entry = it->second;
   auto            access_id        = rand();
   gpu_buffer_entry.access_ids.push_back(access_id);                            // save access id
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &gpu_buffer_entry.ipc_handle, it->second.size, true);
+  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
+    &gpu_buffer_entry.ipc_handle,
+    it->second.size,
+    access_id,
+    true);
   auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
   builder.Finish(msg);
 
