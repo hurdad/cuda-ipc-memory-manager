@@ -16,7 +16,7 @@ services:
     command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/config.tpl" ]
 
   prometheus:
-    image: prom/prometheus:v3.5.0
+    image: prom/prometheus:latest
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -25,6 +25,19 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
 
+  grafana:
+    image: grafana/grafana:latest
+    network_mode: host
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: unless-stopped
+
 volumes:
   zmq_ipc_socket:
   prometheus_data:
+  grafana_data:

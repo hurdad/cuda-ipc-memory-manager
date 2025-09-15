@@ -131,6 +131,9 @@ void CudaIPCServer::run() {
     if (!recv_result)
       continue;
 
+    // Increment total requests
+    requests_total_->Increment();
+
     auto buf  = request_msg.data();
     auto size = request_msg.size();
 
@@ -163,6 +166,7 @@ void CudaIPCServer::run() {
 }
 
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  auto                        start = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // init flatbuffers response
@@ -179,15 +183,15 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   resp.add_buffer_id(&uuid_flatbuffer);
   try {
     // allocate device buffer and get handle
-    auto d_ptr              = CudaUtils::AllocDeviceBuffer(req->size());
-    auto cuda_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
+    auto d_ptr                  = CudaUtils::AllocDeviceBuffer(req->size());
+    auto cuda_ipc_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
 
     // create entry and save device pointer, size and handle
     GPUBufferRecord entry;
     entry.uuid       = buffer_id;
     entry.d_ptr      = d_ptr;
     entry.size       = req->size();
-    entry.ipc_handle = cuda_memory_handle;
+    entry.ipc_handle = cuda_ipc_memory_handle;
     entry.access_ids.push_back(access_id);
     entry.creation_timestamp      = std::chrono::steady_clock::now();
     entry.last_activity_timestamp = std::chrono::steady_clock::now();
@@ -204,10 +208,17 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
     buffers_[buffer_id] = entry;
 
     // save ipc handle to response
-    resp.add_ipc_handle(&cuda_memory_handle);
+    resp.add_ipc_handle(&cuda_ipc_memory_handle);
     resp.add_success(true);
+
+    // metrics update
+    create_buffer_success_->Increment();
+    allocated_buffers_->Set(buffers_.size());
+    allocated_bytes_->Increment(req->size());
   } catch (const std::exception& e) {
     resp.add_success(false);
+    //resp.add_error()
+    create_buffer_fail_->Increment();
   }
 
   // finish up response message
@@ -216,9 +227,15 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
                                                            fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse,
                                                            resp_offset.o);
   builder.Finish(msg);
+
+  // metrics update
+  auto                          end     = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  create_buffer_latency_->Observe(elapsed.count());
 }
 
 void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  auto                        start = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // convert flatbuffers uuid to boost uuid
@@ -237,6 +254,9 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
                                                                        "Buffer not found");
     auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
     builder.Finish(msg);
+
+    auto end = std::chrono::steady_clock::now();
+    get_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
     return;
   }
 
@@ -253,9 +273,15 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
                                                                true);
   auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
   builder.Finish(msg);
+
+  // metrics update
+  auto                          end     = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  get_buffer_latency_->Observe(elapsed.count());
 }
 
 void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  auto                        start = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // convert flatbuffers uuid to boost uuid
@@ -269,6 +295,9 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
     auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Buffer not found");
     auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
     builder.Finish(msg);
+
+    auto end = std::chrono::steady_clock::now();
+    notify_done_latency_->Observe(std::chrono::duration<double>(end - start).count());
     return;
   }
 
@@ -293,6 +322,11 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
 
   // decrement access counter
   gpu_buffer_entry.access_counter--;
+
+  // metrics update
+  auto                          end     = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  notify_done_latency_->Observe(elapsed.count());
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {
@@ -333,6 +367,13 @@ void CudaIPCServer::cleanupExpiredBuffers() {
 
         // Free CUDA memory
         CudaUtils::FreeDeviceBuffer(record.d_ptr);
+
+        // update metrics
+        allocated_bytes_->Decrement(record.size);
+        expired_buffers_->Increment();
+        allocated_buffers_->Set(buffers_.size());
+
+        // remove from hash map
         it = buffers_.erase(it);
       }
     }
