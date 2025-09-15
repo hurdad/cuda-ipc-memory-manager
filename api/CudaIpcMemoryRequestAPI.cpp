@@ -114,7 +114,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
 
   // check response success
   if (!get_response->success()) {
-    throw std::runtime_error("Failed to get CUDA buffer : " + get_response->error()->str());
+    throw std::runtime_error("Failed to get CUDA buffer : "); //+ get_response->error()->str());
   }
 
   auto ipc_handle = get_response->ipc_handle();

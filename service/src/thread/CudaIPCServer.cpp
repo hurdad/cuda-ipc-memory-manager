@@ -82,7 +82,7 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
 CudaIPCServer::~CudaIPCServer() {
   if (server_thread_.joinable()) server_thread_.join();
-  if (expiration_thread_.joinable()) expiration_thread_.join();
+ // if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::start() {
@@ -92,7 +92,7 @@ void CudaIPCServer::start() {
   server_thread_ = std::thread(&CudaIPCServer::run, this);
 
   // Start expiration cleanup thread
-  expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
+  //expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
 }
 
 void CudaIPCServer::stop() {
@@ -101,7 +101,7 @@ void CudaIPCServer::stop() {
 
 void CudaIPCServer::join() {
   if (server_thread_.joinable()) server_thread_.join();
-  if (expiration_thread_.joinable()) expiration_thread_.join();
+  //if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::run() {
@@ -110,6 +110,9 @@ void CudaIPCServer::run() {
     spdlog::trace("Waiting for request...");
     auto recv_result = socket_.recv(request_msg, zmq::recv_flags::none);
     if (!recv_result) continue;
+
+    // we have a request message
+    spdlog::trace("Received message: {}", request_msg.size());
 
     // Increment total requests
     requests_total_->Increment();
@@ -141,6 +144,7 @@ void CudaIPCServer::run() {
     }
 
     // send reply flatbuffers binary response
+    spdlog::trace("Sending response : {}", builder.GetSize());
     socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
   }
 }
@@ -297,6 +301,11 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
 
   // decrement access counter
   gpu_buffer_entry.access_counter--;
+
+  // init flatbuffers success response
+  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+  builder.Finish(msg);
 
   // metrics update
   auto                          end     = std::chrono::steady_clock::now();

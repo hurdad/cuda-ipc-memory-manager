@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   boost::uuids::string_generator          gen;
 
   // Parse the string into a boost::uuids::uuid
-  boost::uuids::uuid buffer_id  = gen("550e8400-e29b-41d4-a716-446655440000");
+  boost::uuids::uuid buffer_id  = gen("8585e8dc-16a7-65ee-66d3-4b95cbc645f5");
   auto               gpu_buffer = api.GetCUDABufferRequest(buffer_id);
 
   // access device pointer as float
