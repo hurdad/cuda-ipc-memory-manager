@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   boost::uuids::string_generator          gen;
 
   // Parse the string into a boost::uuids::uuid
-  boost::uuids::uuid buffer_id  = gen("9ed7ae96-10d4-64ab-37e9-b2c784b94c60");
+  boost::uuids::uuid buffer_id  = gen("bf0b566f-f5b5-14b0-3868-eff252ba4301");
   auto               gpu_buffer = api.GetCUDABufferRequest(buffer_id);
 
   std::cout << "size : " << gpu_buffer.getSize() << std::endl;

@@ -18,6 +18,7 @@
 // Boost UUID
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>  // for to_string
 #include <boost/functional/hash.hpp>
 
 // UUID Util
@@ -33,13 +34,13 @@
 
 struct GPUBufferRecord {
   // GPU Buffer ID
-  boost::uuids::uuid uuid;
+  boost::uuids::uuid buffer_id;
 
   // CUDA IPC handle for sharing GPU memory across processes (flatbuffers)
   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
 
   // How to handle expiration of this buffer
-  fbs::cuda::ipc::api::ExpirationOptions expiration_option;
+  fbs::cuda::ipc::api::ExpirationOptions expiration_option = fbs::cuda::ipc::api::ExpirationOptions_NONE;
 
   // Device pointer to the GPU memory
   void* d_ptr = nullptr;

@@ -17,8 +17,8 @@ int main(int argc, char** argv) {
   cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
 
   // request  gpu buffer
-  int N = 10240;
-  auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float));
+  int N = 268435456 ;
+  auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float), 30);
 
   // get buffer id (uuid
   auto        buffer_id = gpu_buffer.getBufferId();

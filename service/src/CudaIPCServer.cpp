@@ -66,10 +66,10 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
                               .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   free_buffer_latency_ = &prometheus::BuildHistogram()
-                                .Name("cuda_ipc_free_buffer_latency_seconds")
-                                .Help("Latency of FreeCUDABuffer requests in seconds")
-                                .Register(*registry_)
-                                .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                              .Name("cuda_ipc_free_buffer_latency_seconds")
+                              .Help("Latency of FreeCUDABuffer requests in seconds")
+                              .Register(*registry_)
+                              .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
@@ -186,7 +186,7 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
     // create entry and save device pointer, size and handle
     GPUBufferRecord entry;
-    entry.uuid       = buffer_id;
+    entry.buffer_id  = buffer_id;
     entry.d_ptr      = d_ptr;
     entry.size       = req->size();
     entry.ipc_handle = cuda_ipc_memory_handle;
@@ -195,8 +195,10 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
     entry.last_activity_timestamp = std::chrono::steady_clock::now();
 
     if (req->expiration()) {
+      entry.expiration_option = req->expiration()->option_type();
       if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
         entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->option_as_TtlCreationOption()->ttl());
+        entry.expiration_option    = fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption;
       }
 
       // if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
@@ -255,17 +257,13 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   }
 
   // get buffer entry in hashmap
-  GPUBufferRecord &gpu_buffer_entry = it->second;
-  auto            access_id        = rand();
+  GPUBufferRecord& gpu_buffer_entry = it->second;
+  auto             access_id        = rand();
   gpu_buffer_entry.access_ids.push_back(access_id);                            // save access id
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder,
-    &gpu_buffer_entry.ipc_handle,
-    it->second.size,
-    access_id,
-    true);
+  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &gpu_buffer_entry.ipc_handle, it->second.size, access_id, true);
   auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
   builder.Finish(msg);
 
@@ -297,7 +295,7 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   }
 
   // get buffer entry in hashmap
-  GPUBufferRecord gpu_buffer_entry = it->second;
+  GPUBufferRecord& gpu_buffer_entry = it->second;
 
   auto it2 = std::find(gpu_buffer_entry.access_ids.begin(), gpu_buffer_entry.access_ids.end(), req->access_id());
   if (it2 == gpu_buffer_entry.access_ids.end()) {
@@ -319,7 +317,7 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now();
 
   // decrement access counter
-  //gpu_buffer_entry.access_counter--;
+  // gpu_buffer_entry.access_counter--;
 
   // init flatbuffers success response
   auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, true);
@@ -358,7 +356,6 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
 
   // check if we have access ids
   if (!gpu_buffer_entry.access_ids.empty()) {
-
     spdlog::warn("Access IDs not empty");
 
     auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, false, "BAccess IDs not empty");
@@ -408,45 +405,31 @@ void CudaIPCServer::expirationLoop() {
 
 void CudaIPCServer::cleanupExpiredBuffers() {
   spdlog::trace("cleanupExpiredBuffers");
+
   auto                        now = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   for (auto it = buffers_.begin(); it != buffers_.end();) {
     auto& record = it->second;
 
-    // check for expiration
-    if (record.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
-      if (now >= record.expiration_timestamp) {
-        spdlog::info("Buffer expired. Releasing GPU memory.");
+    // Only check buffers that use TTL expiration
+    if (record.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption && now >= record.expiration_timestamp) {
+      spdlog::info("Buffer expired. Releasing GPU memory. buffer_id = {}", boost::uuids::to_string(record.buffer_id));
 
-        // Free CUDA memory
-        CudaUtils::FreeDeviceBuffer(record.d_ptr);
+      // Free CUDA memory
+      CudaUtils::FreeDeviceBuffer(record.d_ptr);
 
-        // update metrics
-        allocated_bytes_->Decrement(record.size);
-        expired_buffers_->Increment();
-        allocated_buffers_->Set(buffers_.size());
+      // Update metrics before erasing
+      allocated_bytes_->Decrement(record.size);
+      expired_buffers_->Increment();
 
-        it = buffers_.erase(it);
-      }
+      // Erase the record and advance iterator safely
+      it = buffers_.erase(it);
+
+      // Update allocated buffers metric
+      allocated_buffers_->Set(buffers_.size());
+    } else {
+      ++it;
     }
-    // else if (record.expiration_type == fbs::cuda::ipc::api::ExpirationOptionsType_ACCESS) {
-    //   if (record.access_counter == 0) {
-    //     spdlog::info("Buffer expired due to zero access count.");
-    //
-    //     // Free CUDA memory
-    //     CudaUtils::FreeDeviceBuffer(record.d_ptr);
-    //
-    //     // update metrics
-    //     allocated_bytes_->Decrement(record.size);
-    //     expired_buffers_->Increment();
-    //     allocated_buffers_->Set(buffers_.size());
-    //
-    //     // remove from hash map
-    //     it = buffers_.erase(it);
-    //   }
-    // }
-
-    ++it;
   }
 }
