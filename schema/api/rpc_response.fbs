@@ -40,12 +40,21 @@ table NotifyDoneResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Response for buffer free
+// ---------------------------------------------------------------------------
+table FreeCUDABufferResponse {
+  success: bool;
+  error: string;
+}
+
+// ---------------------------------------------------------------------------
 // Union of all possible RPC response types
 // ---------------------------------------------------------------------------
 union RPCResponse {
   CreateCUDABufferResponse,
   GetCUDABufferResponse,
-  NotifyDoneResponse
+  NotifyDoneResponse,
+  FreeCUDABufferResponse
 }
 
 // ---------------------------------------------------------------------------

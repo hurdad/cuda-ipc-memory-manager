@@ -33,12 +33,20 @@ table NotifyDoneRequest {
 }
 
 // ---------------------------------------------------------------------------
+// CUDA Buffer Free Request
+// ---------------------------------------------------------------------------
+table FreeCUDABufferRequest {
+  buffer_id: UUID (required);
+}
+
+// ---------------------------------------------------------------------------
 // Union of all possible RPC request types
 // ---------------------------------------------------------------------------
 union RPCRequest {
   CreateCUDABufferRequest,
   GetCUDABufferRequest,
-  NotifyDoneRequest
+  NotifyDoneRequest,
+  FreeCUDABufferRequest
 }
 
 // ---------------------------------------------------------------------------

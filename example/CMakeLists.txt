@@ -17,3 +17,11 @@ add_executable(get-buffer-example
 target_link_libraries(get-buffer-example PRIVATE
         cuda-ipc-memory-manager-api
 )
+
+add_executable(free-buffer-example
+        FreeBufferExample.cu
+)
+
+target_link_libraries(free-buffer-example PRIVATE
+        cuda-ipc-memory-manager-api
+)

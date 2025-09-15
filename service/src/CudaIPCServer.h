@@ -93,6 +93,7 @@ private:
                           flatbuffers::FlatBufferBuilder&                     builder);
   void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder);
   void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder);
+  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder);
 
   static boost::uuids::uuid generateUUID();
 
@@ -108,6 +109,7 @@ private:
   prometheus::Histogram*                create_buffer_latency_;
   prometheus::Histogram*                get_buffer_latency_;
   prometheus::Histogram*                notify_done_latency_;
+  prometheus::Histogram*                free_buffer_latency_;
 };
 
 #endif // CUDA_UTILS_H

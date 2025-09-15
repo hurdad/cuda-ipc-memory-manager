@@ -5,8 +5,8 @@ add_subdirectory(external/prometheus-cpp)
 add_executable(cuda-ipc-memory-manager-service
         src/Main.cpp
         src/ConfigParser.hpp
-        src/thread/CudaIPCServer.cpp
-        src/thread/CudaIPCServer.h
+        src/CudaIPCServer.cpp
+        src/CudaIPCServer.h
 )
 
 target_link_libraries(cuda-ipc-memory-manager-service PRIVATE

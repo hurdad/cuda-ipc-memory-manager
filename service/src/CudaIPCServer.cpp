@@ -49,13 +49,13 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
   create_buffer_latency_ = &prometheus::BuildHistogram()
                                 .Name("cuda_ipc_create_buffer_latency_seconds")
-                                .Help("Latency of CreateBuffer requests in seconds")
+                                .Help("Latency of CreateCUDABuffer requests in seconds")
                                 .Register(*registry_)
                                 .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   get_buffer_latency_ = &prometheus::BuildHistogram()
                              .Name("cuda_ipc_get_buffer_latency_seconds")
-                             .Help("Latency of GetBuffer requests in seconds")
+                             .Help("Latency of GetCUDABuffer requests in seconds")
                              .Register(*registry_)
                              .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
@@ -64,6 +64,12 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
                               .Help("Latency of NotifyDone requests in seconds")
                               .Register(*registry_)
                               .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+
+  free_buffer_latency_ = &prometheus::BuildHistogram()
+                                .Name("cuda_ipc_free_buffer_latency_seconds")
+                                .Help("Latency of FreeCUDABuffer requests in seconds")
+                                .Register(*registry_)
+                                .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
@@ -117,6 +123,11 @@ void CudaIPCServer::run() {
     auto buf  = request_msg.data();
     auto size = request_msg.size();
 
+    flatbuffers::Verifier verifier(static_cast<const uint8_t*>(buf), size);
+    if (!fbs::cuda::ipc::api::VerifyRPCRequestMessageBuffer(verifier)) {
+      spdlog::error("Invalid request message");
+    }
+
     auto rpc_request = fbs::cuda::ipc::api::GetRPCRequestMessage(buf);
     auto req_type    = rpc_request->request_type();
 
@@ -134,6 +145,10 @@ void CudaIPCServer::run() {
 
       case fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest:
         handleNotifyDone(rpc_request->request_as_NotifyDoneRequest(), builder);
+        break;
+
+      case fbs::cuda::ipc::api::RPCRequest_FreeCUDABufferRequest:
+        handleFreeBuffer(rpc_request->request_as_FreeCUDABufferRequest(), builder);
         break;
 
       default:
@@ -315,6 +330,66 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   auto                          end     = std::chrono::steady_clock::now();
   std::chrono::duration<double> elapsed = end - start;
   notify_done_latency_->Observe(elapsed.count());
+}
+
+void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+  auto                        start = std::chrono::steady_clock::now();
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
+
+  // convert flatbuffers uuid to boost uuid
+  auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
+
+  // search for buffer by boost uuid
+  auto it = buffers_.find(buffer_id);
+  if (it == buffers_.end()) {
+    spdlog::warn("Buffer not found");
+
+    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+    builder.Finish(msg);
+
+    auto end = std::chrono::steady_clock::now();
+    free_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    return;
+  }
+
+  // get buffer entry in hashmap
+  GPUBufferRecord gpu_buffer_entry = it->second;
+
+  // check if we have access ids
+  if (!gpu_buffer_entry.access_ids.empty()) {
+
+    spdlog::warn("Access IDs not empty");
+
+    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, false, "BAccess IDs not empty");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+    builder.Finish(msg);
+
+    auto end = std::chrono::steady_clock::now();
+    free_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    return;
+  }
+
+  // delete buffer
+  CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
+
+  // update metrics
+  allocated_bytes_->Decrement(gpu_buffer_entry.size);
+  expired_buffers_->Increment();
+  allocated_buffers_->Set(buffers_.size());
+
+  // remove from hash map
+  buffers_.erase(it);
+
+  // init flatbuffers success response
+  auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+  builder.Finish(msg);
+
+  // metrics update
+  auto                          end     = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  free_buffer_latency_->Observe(elapsed.count());
 }
 
 boost::uuids::uuid CudaIPCServer::generateUUID() {

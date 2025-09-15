@@ -10,7 +10,7 @@
 #include "service_generated.h"
 
 // server implementation
-#include "thread/CudaIPCServer.h"
+#include "CudaIPCServer.h"
 
 static std::atomic_bool g_shutdown(false); // Flag to control server shutdown
 

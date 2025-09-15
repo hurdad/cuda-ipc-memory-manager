@@ -160,4 +160,43 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
     throw std::runtime_error("Failed to notify Done : " + notify_response->error()->str());
   }
 }
+
+void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
+   spdlog::info("Free CUDA buffer = {}");//, buffer_id.str());
+  //  Build FlatBuffer request
+  flatbuffers::FlatBufferBuilder builder;
+  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
+  auto                           req          = fbs::cuda::ipc::api::CreateFreeCUDABufferRequest(builder, &fb_buffer_id);
+  auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_FreeCUDABufferRequest, req.o);
+  builder.Finish(msg);
+
+  // Send request over ZeroMQ
+  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+
+  // Receive response
+  zmq::message_t response_msg;
+  auto           recv_result = socket_.recv(response_msg);
+  if (!recv_result) {
+    throw std::runtime_error("Failed to receive response from server.");
+  }
+
+  // Parse response
+  auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
+  if (!rpc_response) {
+    throw std::runtime_error("Failed to parse RPC response message.");
+  }
+
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse);
+  auto get_response = rpc_response->response_as_FreeCUDABufferResponse();
+  if (!get_response) {
+    throw std::runtime_error("Invalid FreeCUDABufferResponse in RPC response.");
+  }
+
+  // check response success
+  if (!get_response->success()) {
+    throw std::runtime_error("Failed to get CUDA buffer : "); //+ get_response->error()->str());
+  }
+
+}
+
 } // namespace cuda::ipc::api

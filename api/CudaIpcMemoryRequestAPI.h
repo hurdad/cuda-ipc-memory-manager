@@ -38,6 +38,7 @@ public:
   GPUBuffer CreateCUDABufferRequest(uint64_t size);
   GPUBuffer GetCUDABufferRequest(const boost::uuids::uuid buffer_id);
   void      NotifyDoneRequest(const GPUBuffer& buffer);
+  void      FreeCUDABufferRequest(const boost::uuids::uuid buffer_id);
 
 private:
   zmq::context_t context_;
