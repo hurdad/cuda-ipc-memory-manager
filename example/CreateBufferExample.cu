@@ -12,10 +12,12 @@ __global__ void incrementKernel(float* d, int n) {
 }
 
 int main(int argc, char** argv) {
-  cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager.sock");
+
+
+  cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
 
   // request  gpu buffer
-  int N = 10;
+  int N = 10240;
   auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float));
 
   // get buffer id (uuid

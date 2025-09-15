@@ -14,7 +14,7 @@ __global__ void incrementKernel(float* d, int n) {
 }
 
 int main(int argc, char** argv) {
-  cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager.sock");
+  cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
   boost::uuids::string_generator          gen;
 
   // Parse the string into a boost::uuids::uuid

@@ -287,9 +287,12 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   if (it2 == gpu_buffer_entry.access_ids.end()) {
     spdlog::warn("Access ID not found");
 
-    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Acceess ID not found");
+    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Access ID not found");
     auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
     builder.Finish(msg);
+
+    auto end = std::chrono::steady_clock::now();
+    notify_done_latency_->Observe(std::chrono::duration<double>(end - start).count());
     return;
   }
 
