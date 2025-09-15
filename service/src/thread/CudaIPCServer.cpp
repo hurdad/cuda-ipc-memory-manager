@@ -3,7 +3,7 @@
 CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
     : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
   // Init GPU Device
-  // CudaUtils::InitDevice(configuration->gpu_device_index());
+  CudaUtils::InitDevice(configuration->gpu_device_index());
 
   // create an http server for Prometheus metrics
   exposer_ = std::make_unique<prometheus::Exposer>(configuration->prometheus_endpoint()->str());
@@ -38,9 +38,6 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
   // Histogram buckets (in seconds)
   std::vector<double> latency_buckets{
-      1e-9,   // 1 ns
-      10e-9,  // 10 ns
-      100e-9, // 100 ns
       1e-6,   // 1 μs
       10e-6,  // 10 μs
       100e-6, // 100 μs
@@ -82,7 +79,7 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
 CudaIPCServer::~CudaIPCServer() {
   if (server_thread_.joinable()) server_thread_.join();
- // if (expiration_thread_.joinable()) expiration_thread_.join();
+  if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::start() {
@@ -92,7 +89,7 @@ void CudaIPCServer::start() {
   server_thread_ = std::thread(&CudaIPCServer::run, this);
 
   // Start expiration cleanup thread
-  //expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
+  expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
 }
 
 void CudaIPCServer::stop() {
@@ -101,7 +98,7 @@ void CudaIPCServer::stop() {
 
 void CudaIPCServer::join() {
   if (server_thread_.joinable()) server_thread_.join();
-  //if (expiration_thread_.joinable()) expiration_thread_.join();
+  if (expiration_thread_.joinable()) expiration_thread_.join();
 }
 
 void CudaIPCServer::run() {

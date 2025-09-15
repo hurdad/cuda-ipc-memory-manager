@@ -17,7 +17,9 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
   spdlog::info("Creating CUDA buffer of size {} bytes", size);
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
-  auto                           req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size);
+
+  //auto exp_opts =  fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, fbs::cuda::ipc::api::TtlCreationOption(20));
+  auto                           req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size /* ,&exp_opts*/);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
 
