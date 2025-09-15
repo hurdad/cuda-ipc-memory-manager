@@ -13,13 +13,19 @@ CudaIpcMemoryRequestAPI::CudaIpcMemoryRequestAPI(const std::string& endpoint) : 
 CudaIpcMemoryRequestAPI::~CudaIpcMemoryRequestAPI() {
 }
 
-GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
+GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t ttl) {
   spdlog::info("Creating CUDA buffer of size {} bytes", size);
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
 
-  //auto exp_opts =  fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, fbs::cuda::ipc::api::TtlCreationOption(20));
-  auto                           req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size /* ,&exp_opts*/);
+  flatbuffers::Offset<fbs::cuda::ipc::api::CreateCUDABufferRequest> req;
+  if (ttl > 0){
+    auto ttl_opts = fbs::cuda::ipc::api::CreateTtlCreationOption(builder, ttl);
+    auto exp_opts =  fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, ttl_opts.o);
+    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size , exp_opts.o);
+  } else {
+    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size);
+  }
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
 

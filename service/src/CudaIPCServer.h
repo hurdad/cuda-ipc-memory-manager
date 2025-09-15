@@ -39,7 +39,7 @@ struct GPUBufferRecord {
   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
 
   // How to handle expiration of this buffer
-  fbs::cuda::ipc::api::ExpirationOptionsType expiration_type;
+  fbs::cuda::ipc::api::ExpirationOptions expiration_option;
 
   // Device pointer to the GPU memory
   void* d_ptr = nullptr;
@@ -48,7 +48,7 @@ struct GPUBufferRecord {
   size_t size = 0;
 
   // Number of access counts
-  size_t access_counter = 0;
+  //int32_t access_counter = 0;
 
   // Creation Timestamp of the buffer
   std::chrono::steady_clock::time_point creation_timestamp;

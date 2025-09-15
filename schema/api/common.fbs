@@ -2,13 +2,13 @@
 // File: common.fbs
 // Namespace: fbs.cuda.ipc.api
 // ---------------------------------------------------------------------------
-// Common FlatBuffers definitions shared across CUDA IPC requests and responses.
+// Common FlatBuffers definitions shared across CUDA IPC requests and responses
 // ============================================================================
 
 namespace fbs.cuda.ipc.api;
 
 // ---------------------------------------------------------------------------
-// UUID Representation (Struct)
+// UUID Representation
 // 128-bit unique identifier
 // ---------------------------------------------------------------------------
 struct UUID {
@@ -17,47 +17,38 @@ struct UUID {
 }
 
 // ---------------------------------------------------------------------------
-// CUDA IPC Handle [cudaIpcMemHandle_t] Representation (FlatBuffers)
-// 64-byte binary handle used for CUDA inter-process communication
+// CUDA IPC Handle Representation
+// 64-byte binary handle used for CUDA inter-process communication (cudaIpcMemHandle_t)
 // ---------------------------------------------------------------------------
 struct CudaIPCHandle {
   value: [ubyte:64];  // 64-byte binary handle
 }
 
 // ---------------------------------------------------------------------------
-// Expiration Options (Structs)
+// Expiration Strategies
 // ---------------------------------------------------------------------------
-// expire gpu buffer when access counter is reached (includes CreateGPUBuffer)
-struct AccessCountOption {
-  aceess_count: uint64;
+
+// Expire GPU buffer after a specified access count (includes CreateGPUBuffer)
+table AccessCountOption {
+  access_count: uint64;  // Number of accesses before expiration
 }
 
-// expire gpu buffer based on creation timestamp has reached ttl
-struct TtlCreationOption {
-  ttl: uint64; // seconds
-}
-
-// expire buffer based on last activity timestamp has reached ttl
-struct TtlLastActivityOption {
-  ttl: uint64; // seconds
+// Expire GPU buffer when time-to-live (TTL) since creation is reached
+table TtlCreationOption {
+  ttl: uint64;  // TTL in seconds
 }
 
 // ---------------------------------------------------------------------------
-// Union for expiration strategy
+// Union for expiration strategies
 // ---------------------------------------------------------------------------
 union ExpirationOptions {
   AccessCountOption,
-  TtlCreationOption,
-  TtlLastActivityOption
+  TtlCreationOption
 }
 
-
-enum ExpirationOptionsType : byte {
-  NONE = 0,
-  ACCESS = 1,
-  TIMESTAMP = 2,
-}
-
+// ---------------------------------------------------------------------------
+// Expiration Option Wrapper
+// ---------------------------------------------------------------------------
 table ExpirationOption {
-  option : ExpirationOptions (required);
+  option: ExpirationOptions (required);
 }

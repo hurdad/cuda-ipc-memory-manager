@@ -35,7 +35,7 @@ public:
   CudaIpcMemoryRequestAPI(const std::string& endpoint);
   ~CudaIpcMemoryRequestAPI();
 
-  GPUBuffer CreateCUDABufferRequest(uint64_t size);
+  GPUBuffer CreateCUDABufferRequest(size_t size, size_t ttl=0);
   GPUBuffer GetCUDABufferRequest(const boost::uuids::uuid buffer_id);
   void      NotifyDoneRequest(const GPUBuffer& buffer);
   void      FreeCUDABufferRequest(const boost::uuids::uuid buffer_id);
