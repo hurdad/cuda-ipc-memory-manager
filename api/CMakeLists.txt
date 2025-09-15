@@ -11,3 +11,5 @@ target_link_libraries(cuda-ipc-memory-manager-api PUBLIC
         flatbuffers_generated
         zmq
         spdlog::spdlog)
+
+target_include_directories(cuda-ipc-memory-manager-api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

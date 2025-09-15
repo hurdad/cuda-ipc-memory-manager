@@ -9,6 +9,7 @@ add_subdirectory(schema)
 add_subdirectory(util)
 add_subdirectory(api)
 add_subdirectory(service)
+add_subdirectory(example)
 
 # Enable testing
 enable_testing()

@@ -38,6 +38,8 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
     throw std::runtime_error("Failed to receive response from server.");
   }
 
+  spdlog::info("Received response : {}", response_msg.size());
+
   // Parse response
   auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
   if (!rpc_response) {
@@ -51,7 +53,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size) {
 
   // check response success
   if (!create_response->success()) {
-    throw std::runtime_error("Failed to create CUDA buffer : " + create_response->error()->str());
+    throw std::runtime_error("Failed to create CUDA buffer : ");// + create_response->error()->str());
   }
 
   auto buffer_id = create_response->buffer_id();
