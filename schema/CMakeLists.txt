@@ -55,10 +55,10 @@ endforeach ()
 list(REMOVE_DUPLICATES GEN_INCLUDE_DIRS)
 
 # Custom target to group all generation
-add_custom_target(generate_fbs DEPENDS ${GEN_HDRS})
+add_custom_target(cuda-ipc-generate-fbs DEPENDS ${GEN_HDRS})
 
 # Interface library to propagate includes + build order
-add_library(flatbuffers_generated INTERFACE)
-add_dependencies(flatbuffers_generated generate_fbs)
-target_include_directories(flatbuffers_generated INTERFACE ${GEN_INCLUDE_DIRS})
+add_library(cuda-ipc-flatbuffers-generated INTERFACE)
+add_dependencies(cuda-ipc-flatbuffers-generated cuda-ipc-generate-fbs)
+target_include_directories(cuda-ipc-flatbuffers-generated INTERFACE ${GEN_INCLUDE_DIRS})
 

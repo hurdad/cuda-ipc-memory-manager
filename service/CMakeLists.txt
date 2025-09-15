@@ -12,7 +12,7 @@ add_executable(cuda-ipc-memory-manager-service
 target_link_libraries(cuda-ipc-memory-manager-service PRIVATE
         Boost::program_options
         flatbuffers
-        flatbuffers_generated
+        cuda-ipc-flatbuffers-generated
         zmq
         spdlog::spdlog
         cuda-util

@@ -8,7 +8,7 @@ add_library(cuda-ipc-memory-manager-api STATIC
 
 target_link_libraries(cuda-ipc-memory-manager-api PUBLIC
         cuda-util
-        flatbuffers_generated
+        cuda-ipc-flatbuffers-generated
         zmq
         spdlog::spdlog)
 

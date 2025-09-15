@@ -6,6 +6,6 @@ add_library(cuda-util STATIC
         UUIDConverter.hpp
 )
 
-target_link_libraries(cuda-util PUBLIC flatbuffers_generated)
+target_link_libraries(cuda-util PUBLIC cuda-ipc-flatbuffers-generated)
 
 target_include_directories(cuda-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
