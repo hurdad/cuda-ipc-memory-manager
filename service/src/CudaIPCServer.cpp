@@ -93,9 +93,20 @@ void CudaIPCServer::start() {
 
   // Start server zmq server thread
   server_thread_ = std::thread(&CudaIPCServer::run, this);
+  if (setThreadRealtime(server_thread_)) {
+    spdlog::info("Successfully set server_thread to real-time priority!");
+  } else {
+    spdlog::warn("Failed to set server_thread real-time priority.");
+  }
 
   // Start expiration cleanup thread
   expiration_thread_ = std::thread(&CudaIPCServer::expirationLoop, this);
+  if (setThreadRealtime(expiration_thread_)) {
+    spdlog::info("Successfully set expiration_thread to real-time priority!");
+  } else {
+    spdlog::warn("Failed to set expiration_thread real-time priority.");
+    ;
+  }
 }
 
 void CudaIPCServer::stop() {
@@ -113,6 +124,9 @@ void CudaIPCServer::run() {
     spdlog::trace("Waiting for request...");
     auto recv_result = socket_.recv(request_msg, zmq::recv_flags::none);
     if (!recv_result) continue;
+
+    // start timestamp
+    std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
 
     // we have a request message
     spdlog::trace("Received message: {}", request_msg.size());
@@ -132,23 +146,23 @@ void CudaIPCServer::run() {
     auto req_type    = rpc_request->request_type();
 
     // builder for response
-    flatbuffers::FlatBufferBuilder builder;
+    flatbuffers::FlatBufferBuilder response_builder;
 
     switch (req_type) {
       case fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest:
-        handleCreateBuffer(rpc_request->request_as_CreateCUDABufferRequest(), builder);
+        handleCreateBuffer(rpc_request->request_as_CreateCUDABufferRequest(), response_builder, start);
         break;
 
       case fbs::cuda::ipc::api::RPCRequest_GetCUDABufferRequest:
-        handleGetBuffer(rpc_request->request_as_GetCUDABufferRequest(), builder);
+        handleGetBuffer(rpc_request->request_as_GetCUDABufferRequest(), response_builder, start);
         break;
 
       case fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest:
-        handleNotifyDone(rpc_request->request_as_NotifyDoneRequest(), builder);
+        handleNotifyDone(rpc_request->request_as_NotifyDoneRequest(), response_builder, start);
         break;
 
       case fbs::cuda::ipc::api::RPCRequest_FreeCUDABufferRequest:
-        handleFreeBuffer(rpc_request->request_as_FreeCUDABufferRequest(), builder);
+        handleFreeBuffer(rpc_request->request_as_FreeCUDABufferRequest(), response_builder, start);
         break;
 
       default:
@@ -156,17 +170,21 @@ void CudaIPCServer::run() {
     }
 
     // send reply flatbuffers binary response
-    spdlog::trace("Sending response : {}", builder.GetSize());
-    socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+    spdlog::trace("Sending response : {}", response_builder.GetSize());
+    auto result = socket_.send(zmq::buffer(response_builder.GetBufferPointer(), response_builder.GetSize()), zmq::send_flags::none);
+    if (!result.has_value()) {
+      spdlog::error( "ZMQ Send failed. Error: {}", zmq_strerror(zmq_errno()));
+    }
   }
 }
 
-void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
+void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                                       std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   auto                        start = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // init flatbuffers response
-  auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(builder);
+  auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(response_builder);
 
   // generate ids
   auto buffer_id = generateUUID();
@@ -225,17 +243,17 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // finish up response message
   auto resp_offset = resp.Finish();
-  auto msg         = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse, resp_offset.o);
-  builder.Finish(msg);
+  auto msg =
+      fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse, resp_offset.o);
+  response_builder.Finish(msg);
 
   // metrics update
-  auto                          end     = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
+  std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
   create_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-  auto                        start = std::chrono::steady_clock::now();
+void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                                    std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // convert flatbuffers uuid to boost uuid
@@ -247,12 +265,12 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
     spdlog::warn("Buffer not found");
 
     // return error
-    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(builder, nullptr, it->second.size, 0, false, "Buffer not found");
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
-    builder.Finish(msg);
+    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponseDirect(response_builder, nullptr, it->second.size, 0, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+    response_builder.Finish(msg);
 
-    auto end = std::chrono::steady_clock::now();
-    get_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
+    get_buffer_latency_->Observe(elapsed.count());
     return;
   }
 
@@ -263,18 +281,17 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(builder, &gpu_buffer_entry.ipc_handle, it->second.size, access_id, true);
-  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
-  builder.Finish(msg);
+  auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(response_builder, &gpu_buffer_entry.ipc_handle, it->second.size, access_id, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+  response_builder.Finish(msg);
 
   // metrics update
-  auto                          end     = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
+  std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
   get_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-  auto                        start = std::chrono::steady_clock::now();
+void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                                     std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // convert flatbuffers uuid to boost uuid
@@ -285,12 +302,12 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   if (it == buffers_.end()) {
     spdlog::warn("Buffer not found");
 
-    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Buffer not found");
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
-    builder.Finish(msg);
+    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(response_builder, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+    response_builder.Finish(msg);
 
-    auto end = std::chrono::steady_clock::now();
-    notify_done_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
+    notify_done_latency_->Observe(elapsed.count());
     return;
   }
 
@@ -301,12 +318,12 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   if (it2 == gpu_buffer_entry.access_ids.end()) {
     spdlog::warn("Access ID not found");
 
-    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, false, "Access ID not found");
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
-    builder.Finish(msg);
+    auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(response_builder, false, "Access ID not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+    response_builder.Finish(msg);
 
-    auto end = std::chrono::steady_clock::now();
-    notify_done_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
+    notify_done_latency_->Observe(elapsed.count());
     return;
   }
 
@@ -320,18 +337,17 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   // gpu_buffer_entry.access_counter--;
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(builder, true);
-  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
-  builder.Finish(msg);
+  auto resp = fbs::cuda::ipc::api::CreateNotifyDoneResponseDirect(response_builder, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse, resp.o);
+  response_builder.Finish(msg);
 
   // metrics update
-  auto                          end     = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
+  std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
   notify_done_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder) {
-  auto                        start = std::chrono::steady_clock::now();
+void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                                     std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   std::lock_guard<std::mutex> lock(buffers_mutex_);
 
   // convert flatbuffers uuid to boost uuid
@@ -342,12 +358,12 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
   if (it == buffers_.end()) {
     spdlog::warn("Buffer not found");
 
-    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, false, "Buffer not found");
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
-    builder.Finish(msg);
+    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(response_builder, false, "Buffer not found");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+    response_builder.Finish(msg);
 
-    auto end = std::chrono::steady_clock::now();
-    free_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
+    free_buffer_latency_->Observe(elapsed.count());
     return;
   }
 
@@ -358,12 +374,12 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
   if (!gpu_buffer_entry.access_ids.empty()) {
     spdlog::warn("Access IDs not empty");
 
-    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, false, "BAccess IDs not empty");
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
-    builder.Finish(msg);
+    auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(response_builder, false, "BAccess IDs not empty");
+    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+    response_builder.Finish(msg);
 
-    auto end = std::chrono::steady_clock::now();
-    free_buffer_latency_->Observe(std::chrono::duration<double>(end - start).count());
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
+    free_buffer_latency_->Observe(elapsed.count());
     return;
   }
 
@@ -379,13 +395,12 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
   buffers_.erase(it);
 
   // init flatbuffers success response
-  auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(builder, true);
-  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
-  builder.Finish(msg);
+  auto resp = fbs::cuda::ipc::api::CreateFreeCUDABufferResponseDirect(response_builder, true);
+  auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse, resp.o);
+  response_builder.Finish(msg);
 
   // metrics update
-  auto                          end     = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
+  std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
   free_buffer_latency_->Observe(elapsed.count());
 }
 
@@ -401,6 +416,13 @@ void CudaIPCServer::expirationLoop() {
     cleanupExpiredBuffers();
     std::this_thread::sleep_for(5s); // Run every second
   }
+}
+
+bool CudaIPCServer::setThreadRealtime(std::thread& t) {
+  pthread_t   handle = t.native_handle();
+  sched_param sch_params;
+  sch_params.sched_priority = sched_get_priority_max(SCHED_FIFO);
+  return pthread_setschedparam(handle, SCHED_FIFO, &sch_params) == 0;
 }
 
 void CudaIPCServer::cleanupExpiredBuffers() {

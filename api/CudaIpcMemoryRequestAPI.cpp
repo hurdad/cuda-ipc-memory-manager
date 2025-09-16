@@ -19,10 +19,10 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t t
   flatbuffers::FlatBufferBuilder builder;
 
   flatbuffers::Offset<fbs::cuda::ipc::api::CreateCUDABufferRequest> req;
-  if (ttl > 0){
+  if (ttl > 0) {
     auto ttl_opts = fbs::cuda::ipc::api::CreateTtlCreationOption(builder, ttl);
-    auto exp_opts =  fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, ttl_opts.o);
-    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size , exp_opts.o);
+    auto exp_opts = fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, ttl_opts.o);
+    req           = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size, exp_opts.o);
   } else {
     req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size);
   }
@@ -30,7 +30,10 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t t
   builder.Finish(msg);
 
   // Send request over ZeroMQ
-  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto send_result = socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  if (!send_result.has_value()) {
+    throw std::runtime_error(fmt::format("ZMQ Send failed. Error: {}", zmq_strerror(zmq_errno())));
+  }
 
   // Receive response
   zmq::message_t response_msg;
@@ -90,7 +93,10 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
   builder.Finish(msg);
 
   // Send request over ZeroMQ
-  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto send_result = socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  if (!send_result.has_value()) {
+    throw std::runtime_error(fmt::format("ZMQ Send failed. Error: {}", zmq_strerror(zmq_errno())));
+  }
 
   // Receive response
   zmq::message_t response_msg;
@@ -143,7 +149,10 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
   builder.Finish(msg);
 
   // Send request over ZeroMQ
-  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto send_result = socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  if (!send_result.has_value()) {
+    throw std::runtime_error(fmt::format("ZMQ Send failed. Error: {}", zmq_strerror(zmq_errno())));
+  }
 
   // Receive response
   zmq::message_t response_msg;
@@ -171,7 +180,7 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
 }
 
 void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
-   spdlog::info("Free CUDA buffer = {}");//, buffer_id.str());
+  spdlog::info("Free CUDA buffer = {}"); //, buffer_id.str());
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
@@ -180,7 +189,10 @@ void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buf
   builder.Finish(msg);
 
   // Send request over ZeroMQ
-  socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  auto send_result = socket_.send(zmq::buffer(builder.GetBufferPointer(), builder.GetSize()), zmq::send_flags::none);
+  if (!send_result.has_value()) {
+    throw std::runtime_error(fmt::format("ZMQ Send failed. Error: {}", zmq_strerror(zmq_errno())));
+  }
 
   // Receive response
   zmq::message_t response_msg;
@@ -205,7 +217,6 @@ void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buf
   if (!get_response->success()) {
     throw std::runtime_error("Failed to get CUDA buffer : "); //+ get_response->error()->str());
   }
-
 }
 
 } // namespace cuda::ipc::api

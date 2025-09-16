@@ -1,25 +1,26 @@
 #ifndef CUDA_IPC_SERVER_H
 #define CUDA_IPC_SERVER_H
 
+#include <spdlog/spdlog.h>
+
 #include <atomic>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <string>
 #include <zmq.hpp>
-#include <spdlog/spdlog.h>
 
 // Prometheus Metrics
 #include <prometheus/counter.h>
-#include <prometheus/histogram.h>
 #include <prometheus/exposer.h>
+#include <prometheus/histogram.h>
 #include <prometheus/registry.h>
 
 // Boost UUID
+#include <boost/functional/hash.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>  // for to_string
-#include <boost/functional/hash.hpp>
+#include <boost/uuid/uuid_io.hpp> // for to_string
 
 // UUID Util
 #include "UUIDConverter.hpp"
@@ -28,9 +29,9 @@
 #include "CudaUtils.h"
 
 // FlatBuffers header generated from schema .fbs
-#include "service_generated.h"
 #include "api/rpc_request_generated.h"
 #include "api/rpc_response_generated.h"
+#include "service_generated.h"
 
 struct GPUBufferRecord {
   // GPU Buffer ID
@@ -49,7 +50,7 @@ struct GPUBufferRecord {
   size_t size = 0;
 
   // Number of access counts
-  //int32_t access_counter = 0;
+  // int32_t access_counter = 0;
 
   // Creation Timestamp of the buffer
   std::chrono::steady_clock::time_point creation_timestamp;
@@ -65,7 +66,7 @@ struct GPUBufferRecord {
 };
 
 class CudaIPCServer {
-public:
+ public:
   CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration);
   ~CudaIPCServer();
 
@@ -73,7 +74,7 @@ public:
   void stop();
   void join();
 
-private:
+ private:
   const fbs::cuda::ipc::service::Configuration*                                            configuration_;
   zmq::context_t                                                                           context_;
   zmq::socket_t                                                                            socket_;
@@ -90,13 +91,17 @@ private:
   void cleanupExpiredBuffers();
 
   // Functions for handling individual request types
-  void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
-                          flatbuffers::FlatBufferBuilder&                     builder);
-  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder);
-  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& builder);
-  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& builder);
+  void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                          std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
+  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                       std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
+  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                        std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
+  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                        std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
 
   static boost::uuids::uuid generateUUID();
+  bool                      setThreadRealtime(std::thread& t);
 
   // Prometheus metrics
   std::shared_ptr<prometheus::Registry> registry_;
