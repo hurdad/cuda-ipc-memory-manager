@@ -74,7 +74,7 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t t
   }
 
   // get device pointer from ipc_handle
-  void* d_ptr = CudaUtils::HandleToCudaMemory(*ipc_handle);
+  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
 
   // build return struct GPUBuffer
   return GPUBuffer(util::UUIDConverter::toBoostUUID(*buffer_id), access_id, d_ptr, size);
@@ -125,13 +125,16 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
   auto size      = get_response->size();
 
   // get device pointer from ipc_handle
-  void* d_ptr = CudaUtils::HandleToCudaMemory(*ipc_handle);
+  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
 
   // build return struct GPUBuffer
   return GPUBuffer(buffer_id, access_id, d_ptr, size);
 }
 
 void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
+  // close the gpu memory handle
+  CudaUtils::CloseHandleToCudaMemory(gpu_buffer.getDataPtr());
+
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());

@@ -56,7 +56,14 @@ public:
    * @return Device pointer corresponding to the IPC handle.
    * @throws std::runtime_error if opening the IPC handle fails.
    */
-  static void* HandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle);
+  static void* OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle);
+
+  /**
+ * @brief Close a CUDA IPC handle
+  * @param d_ptr Device pointer.
+ * @throws std::runtime_error if opening the IPC handle fails.
+ */
+  static void CloseHandleToCudaMemory(void* d_ptr);
 };
 
 #endif // CUDA_UTILS_H

@@ -93,7 +93,7 @@ fbs::cuda::ipc::api::CudaIPCHandle CudaUtils::GetCudaMemoryHandle(void* d_ptr) {
   return fbs::cuda::ipc::api::CudaIPCHandle(fb_span);
 }
 
-void* CudaUtils::HandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle) {
+void* CudaUtils::OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle) {
   cudaIpcMemHandle_t handle;
   static_assert(sizeof(handle) <= sizeof(cuda_ipc_handle),
                 "Array size is too small for cudaIpcMemHandle_t");
@@ -108,4 +108,15 @@ void* CudaUtils::HandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cu
 
   std::cout << "[CudaUtils] Opened CUDA IPC handle, device pointer: " << d_ptr << "\n";
   return d_ptr;
+}
+
+void CudaUtils::CloseHandleToCudaMemory(void* d_ptr) {
+  // close ipc gpu memory
+  cudaError_t status = cudaIpcCloseMemHandle(d_ptr);
+  if (status != cudaSuccess) {
+    std::cerr << "[CudaUtils] cudaIpcCloseMemHandle failed: " << cudaGetErrorString(status) << "\n";
+    throw std::runtime_error("cudaIpcCloseMemHandle failed");
+  }
+
+  std::cout << "[CudaUtils] Close CUDA IPC handle \n";
 }
