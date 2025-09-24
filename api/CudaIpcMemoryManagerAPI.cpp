@@ -19,13 +19,14 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size,
                                                            size_t   ttl,
                                                            bool     zero_buffer) {
   spdlog::info("Creating CUDA buffer of size {} bytes on device {}", size, gpu_device_index);
-  // Build FlatBuffer request
-  flatbuffers::FlatBufferBuilder                                    builder;
-  auto req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
-                                                           size,
-                                                           gpu_device_index,
-                                                           fbs::cuda::ipc::api::ExpirationOption(access_count, ttl),
-                                                           zero_buffer);
+  // Build FlatBuffer IPC request
+  flatbuffers::FlatBufferBuilder        builder;
+  fbs::cuda::ipc::api::ExpirationOption expiration_option(access_count, ttl);
+  auto                                  req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
+                                                                size,
+                                                                gpu_device_index,
+                                                                &expiration_option,
+                                                                zero_buffer);
 
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
@@ -84,7 +85,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size,
   // make sure response device index matches the requested index
   assert(gpu_device_index == create_response->gpu_device_index());
 
-  // make sure response size matches the requested size
+  // make sure response gpu buffer size matches the requested gpu buffer size
   assert(size == create_response->size());
 
   auto ipc_handle = create_response->ipc_handle();
@@ -113,7 +114,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size,
 
 GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
   spdlog::info("Getting CUDA buffer = {}", boost::uuids::to_string(buffer_id));
-  //  Build FlatBuffer request
+  //  Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
   auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
   auto req = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
@@ -200,10 +201,10 @@ GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid
 }
 
 void CudaIpcMemoryManagerAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
-  // close the gpu memory handle
+  // close the gpu memory handle must be locally
   CudaUtils::CloseHandleToCudaMemory(gpu_buffer.getDataPtr());
 
-  // Build FlatBuffer request
+  // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
   auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
   auto req = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
@@ -255,7 +256,7 @@ void CudaIpcMemoryManagerAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
 }
 
 void CudaIpcMemoryManagerAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
-  spdlog::info("Free CUDA buffer = {}"); //, buffer_id.str());
+  spdlog::info("Free CUDA buffer = {}", boost::uuids::to_string(buffer_id));
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
