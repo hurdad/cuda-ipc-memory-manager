@@ -6,7 +6,7 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
   auto gpu_devices = configuration->cuda_gpu_devices();
   if (gpu_devices) {
     for (auto cuda_gpu_device : *gpu_devices) {
-      // CUDA memory info for this process and device
+      // CUDA memory info for this process and device (make sure device exists)
       size_t freeMem = 0, totalMem = 0;
       CudaUtils::SetDevice(cuda_gpu_device->cuda_gpu_index());
       CudaUtils::GetMemoryInfo(&freeMem, &totalMem);
@@ -242,7 +242,7 @@ void CudaIPCServer::run() {
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
                                        flatbuffers::FlatBufferBuilder&                     response_builder,
                                        std::chrono::time_point<std::chrono::steady_clock>  start_timestamp) {
-  // find total memory for requested device
+  // find total memory for requested gpu_device_index
   auto it = max_gpu_total_memory_.find(req->gpu_device_index());
   if (it == max_gpu_total_memory_.end()) {
     throw std::runtime_error(fmt::format("GPU Device Not Found = {}", req->gpu_device_index()));

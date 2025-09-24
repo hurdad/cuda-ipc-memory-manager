@@ -36,8 +36,8 @@ std::vector<prometheus::MetricFamily> GpuMetricsCollector::Collect() const {
   MetricFamily gpuMemUsedFamily{"gpu_memory_used_mib", {}, MetricType::Gauge};
   MetricFamily gpuMemTotalFamily{"gpu_memory_total_mib", {}, MetricType::Gauge};
   MetricFamily gpuMemUtilFamily{"gpu_memory_utilization_percent", {}, MetricType::Gauge};
-  MetricFamily gpuMemFreeProcessFamily{"gpu_memory_free_process_mib", {}, MetricType::Gauge};
-  MetricFamily gpuCudaTotalFamily{"gpu_memory_total_process_mib", {}, MetricType::Gauge};
+  MetricFamily gpuMemFreeProcessFamily{"cuda_ipc_memory_free_mib", {}, MetricType::Gauge};
+  MetricFamily gpuCudaTotalFamily{"cuda_ipc_memory_total_mib", {}, MetricType::Gauge};
   MetricFamily gpuTempFamily{"gpu_temperature_celsius", {}, MetricType::Gauge};
   MetricFamily gpuPowerFamily{"gpu_power_watts", {}, MetricType::Gauge};
   MetricFamily gpuFanFamily{"gpu_fan_percent", {}, MetricType::Gauge};
