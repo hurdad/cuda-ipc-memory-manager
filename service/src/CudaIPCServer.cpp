@@ -2,7 +2,34 @@
 
 CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
   : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
-  // get gpu total
+  // get gpu total mem for each device and calculate max gpu memory to allocate
+  auto gpu_devices = configuration->cuda_gpu_devices();
+  if (gpu_devices) {
+    for (auto cuda_gpu_device : *gpu_devices) {
+      // CUDA memory info for this process and device
+      size_t freeMem = 0, totalMem = 0;
+      CudaUtils::SetDevice(cuda_gpu_device->cuda_gpu_index());
+      CudaUtils::GetMemoryInfo(&freeMem, &totalMem);
+
+      // Check max memory allocation type
+      auto max_allocation_type = cuda_gpu_device->max_memory_allocation_type();
+      if (max_allocation_type) {
+        switch (max_allocation_type) {
+          case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxFixedMemoryBytes:
+            max_gpu_total_memory_[cuda_gpu_device->cuda_gpu_index()] = cuda_gpu_device->max_memory_allocation_as_MaxFixedMemoryBytes()->value();
+            break;
+
+          case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxGPUMemoryPercentage:
+            max_gpu_total_memory_[cuda_gpu_device->cuda_gpu_index()] =
+                totalMem * cuda_gpu_device->max_memory_allocation_as_MaxGPUMemoryPercentage()->value();
+            break;
+
+          default:
+            throw std::runtime_error("Unknown Max Memory Allocation Type");
+        }
+      }
+    }
+  }
 
   // create an http server for Prometheus metrics
   exposer_ = std::make_unique<prometheus::Exposer>(configuration->prometheus_endpoint()->str());
@@ -215,28 +242,15 @@ void CudaIPCServer::run() {
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
                                        flatbuffers::FlatBufferBuilder&                     response_builder,
                                        std::chrono::time_point<std::chrono::steady_clock>  start_timestamp) {
-  // lookup gpu_device_index in config
-  auto cuda_gpu_device = configuration_->cuda_gpu_devices()->LookupByKey(req->gpu_device_index());
-  if (!cuda_gpu_device) {
-    throw std::runtime_error(fmt::format("GPU Device ID not found = {}", req->gpu_device_index()));
+  // find total memory for requested device
+  auto it = max_gpu_total_memory_.find(req->gpu_device_index());
+  if (it == max_gpu_total_memory_.end()) {
+    throw std::runtime_error(fmt::format("GPU Device Not Found = {}", req->gpu_device_index()));
   }
 
-  if (auto max_memory_allocation_type = cuda_gpu_device->max_memory_allocation_type()) {
-    switch (max_memory_allocation_type) {
-      case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxFixedMemoryBytes:
-        uint64_t max_memory_bytes = cuda_gpu_device->max_memory_allocation_as_MaxFixedMemoryBytes()->value();
-        if (allocated_bytes_->Value() + req->size() > max_memory_bytes) {
-          throw std::runtime_error("Out of Memory: Not enough free memory to satisfy the request.");
-        }
-        break;
-
-        // case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxGPUMemoryPercentage:
-        //
-        //   break;
-
-        // default:
-        //   throw std::runtime_error("Unknown Max Memory Allocation Type");
-    }
+  // check if we have enough memory left (allocated + requested > total mem)
+  if (allocated_bytes_->Value() + req->size() > it->second) {
+    throw std::runtime_error("Out of Memory: Not enough free memory to satisfy the request.");
   }
 
   // set device before allocate

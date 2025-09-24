@@ -57,6 +57,7 @@ private:
   std::atomic<bool>                             running_; // stop flag
   GPUBufferMultiIndex                           buffers_; // container that holds GPUBufferRecord
   std::mutex                                    buffers_mutex_; // <-- Protects access to buffers_
+  std::map<int32_t, size_t>                     max_gpu_total_memory_; // max gpu total memory mapped by gpu_device_index
 
   // Main server loop
   void run();

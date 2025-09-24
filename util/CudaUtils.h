@@ -98,6 +98,8 @@ public:
    * @throws std::runtime_error if cudaMemGetInfo fails.
    */
   static void GetMemoryInfo(size_t* free, size_t* total);
+
+  static void GetTotalMemoryInfo(size_t* free, size_t* total);
 };
 
 #endif // CUDA_UTILS_H

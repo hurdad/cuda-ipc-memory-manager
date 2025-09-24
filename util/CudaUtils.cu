@@ -91,4 +91,8 @@ void CudaUtils::CloseHandleToCudaMemory(void* d_ptr) {
 void CudaUtils::GetMemoryInfo(size_t* free, size_t* total) {
   // Get cuda mem info; throws on failure
   CUDA_CHECK(cudaMemGetInfo(free, total));
+
+
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 1);
 }

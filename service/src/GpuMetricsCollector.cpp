@@ -71,7 +71,7 @@ std::vector<prometheus::MetricFamily> GpuMetricsCollector::Collect() const {
     nvmlReturn_t fanRes       = nvmlDeviceGetFanSpeed(device, &fanPercent);
     bool         fanSupported = (fanRes == NVML_SUCCESS);
 
-    // CUDA memory info for this process
+    // CUDA memory info for this process and device
     size_t freeMem = 0, totalMem = 0;
     CudaUtils::SetDevice(i);
     CudaUtils::GetMemoryInfo(&freeMem, &totalMem);
