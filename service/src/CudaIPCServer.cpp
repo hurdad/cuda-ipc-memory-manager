@@ -1,7 +1,5 @@
 #include "CudaIPCServer.h"
 
-#include "../../api/CudaIpcMemoryRequestAPI.h"
-
 CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
   : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
   // create an http server for Prometheus metrics
@@ -75,6 +73,9 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
+
+  // Register GPU collector directly with the exposer
+  exposer_->RegisterCollectable(std::make_shared<GpuMetricsCollector>());
 
   // bind zmq req socket
   socket_.bind(configuration->zmq_request_endpoint()->str());

@@ -7,6 +7,8 @@ add_executable(cuda-ipc-memory-manager-service
         src/ConfigParser.hpp
         src/CudaIPCServer.cpp
         src/CudaIPCServer.h
+        src/GpuMetricsCollector.cpp
+        src/GpuMetricsCollector.h
 )
 
 target_link_libraries(cuda-ipc-memory-manager-service PRIVATE
@@ -17,6 +19,7 @@ target_link_libraries(cuda-ipc-memory-manager-service PRIVATE
         spdlog::spdlog
         cuda-util
         prometheus-cpp::pull
+        nvidia-ml
 )
 
 target_include_directories(cuda-ipc-memory-manager-service PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

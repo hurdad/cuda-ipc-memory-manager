@@ -90,6 +90,14 @@ public:
    * @throws std::runtime_error if cudaIpcCloseMemHandle fails.
    */
   static void CloseHandleToCudaMemory(void* d_ptr);
+
+  /**
+   * Get Memory Info for current cuda process
+   * @param free Pointer to free memory
+   * @param total Pointer to total memory
+   * @throws std::runtime_error if cudaMemGetInfo fails.
+   */
+  static void GetMemoryInfo(size_t* free, size_t* total);
 };
 
 #endif // CUDA_UTILS_H

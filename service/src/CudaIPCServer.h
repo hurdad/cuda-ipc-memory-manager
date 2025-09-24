@@ -33,6 +33,9 @@
 #include "api/rpc_response_generated.h"
 #include "service_generated.h"
 
+// GPU Metrics
+#include "GpuMetricsCollector.h"
+
 struct GPUBufferRecord {
   // GPU Buffer ID
   boost::uuids::uuid buffer_id;

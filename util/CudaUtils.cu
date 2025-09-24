@@ -20,10 +20,10 @@ void* CudaUtils::AllocDeviceBuffer(size_t numBytes, bool zeroInitialize) {
   if (zeroInitialize) {
     CUDA_CHECK(cudaMemset(d_buffer, 0, numBytes));
     std::cout << "[CudaUtils] Zero-initialized device buffer at " << d_buffer
-              << " (" << numBytes << " bytes)\n";
+        << " (" << numBytes << " bytes)\n";
   } else {
     std::cout << "[CudaUtils] Allocated device buffer at " << d_buffer
-              << " (" << numBytes << " bytes)\n";
+        << " (" << numBytes << " bytes)\n";
   }
 
   return d_buffer;
@@ -86,4 +86,9 @@ void CudaUtils::CloseHandleToCudaMemory(void* d_ptr) {
   // Close IPC handle; throws on failure
   CUDA_CHECK(cudaIpcCloseMemHandle(d_ptr));
   std::cout << "[CudaUtils] Closed CUDA IPC handle\n";
+}
+
+void CudaUtils::GetMemoryInfo(size_t* free, size_t* total) {
+  // Get cuda mem info; throws on failure
+  CUDA_CHECK(cudaMemGetInfo(free, total));
 }
