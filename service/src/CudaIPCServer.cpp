@@ -204,7 +204,8 @@ void CudaIPCServer::run() {
   }
 }
 
-void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
+                                       flatbuffers::FlatBufferBuilder&                     response_builder,
                                        std::chrono::time_point<std::chrono::steady_clock>  start_timestamp) {
   // lookup gpu_device_index in config
   auto cuda_gpu_device = configuration_->cuda_gpu_devices()->LookupByKey(req->gpu_device_index());
@@ -236,20 +237,21 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   resp.add_gpu_device_index(req->gpu_device_index());
 
   // create entry and save device pointer, size and handle
-  GPUBufferRecord entry;
-  entry.buffer_id  = buffer_id;
-  entry.d_ptr      = d_ptr;
-  entry.size       = req->size();
-  entry.ipc_handle = cuda_ipc_memory_handle;
-  entry.access_ids.push_back(access_id);
-  entry.creation_timestamp      = std::chrono::steady_clock::now();
-  entry.last_activity_timestamp = std::chrono::steady_clock::now();
+  GPUBufferRecord new_entry;
+  new_entry.buffer_id  = buffer_id;
+  new_entry.d_ptr      = d_ptr;
+  new_entry.size       = req->size();
+  new_entry.ipc_handle = cuda_ipc_memory_handle;
+  new_entry.access_ids.push_back(access_id);
+  new_entry.creation_timestamp      = std::chrono::steady_clock::now();
+  new_entry.last_activity_timestamp = std::chrono::steady_clock::now();
 
   if (req->expiration()) {
-    entry.expiration_option = req->expiration()->option_type();
+    new_entry.expiration_option = req->expiration()->option_type();
     if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
-      entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->option_as_TtlCreationOption()->ttl());
-      entry.expiration_option    = fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption;
+      new_entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(
+                                           req->expiration()->option_as_TtlCreationOption()->ttl());
+      new_entry.expiration_option = fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption;
     }
 
     // if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
@@ -261,8 +263,13 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   {
     std::lock_guard<std::mutex> lock(buffers_mutex_);
 
-    // add entry to buffers_ hash map
-    buffers_[buffer_id] = entry;
+    // Insert new_entry into into the container
+    auto result = buffers_.insert(std::move(new_entry));
+
+    if (!result.second) {
+      // insertion failed (duplicate buffer_id)
+      throw std::runtime_error("Buffer with this ID already exists!");
+    }
 
     // update metric while locked
     allocated_buffers_->Set(buffers_.size()); // update metric while locked
@@ -283,7 +290,8 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   create_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req,
+                                    flatbuffers::FlatBufferBuilder&                    response_builder,
                                     std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -292,23 +300,30 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   {
     std::lock_guard<std::mutex> lock(buffers_mutex_);
 
-    // search for buffer by buffer_id uuid
-    auto it = buffers_.find(buffer_id);
-    if (it == buffers_.end()) {
+    // search for buffer by buffer_id uuid using id index
+    auto& id_index = buffers_.get<ByBufferId>();
+    auto  it       = id_index.find(buffer_id);
+    if (it == id_index.end()) {
       throw std::runtime_error(fmt::format("Buffer ID not found = {}", boost::uuids::to_string(buffer_id)));
     }
 
-    // get buffer entry in hashmap
-    GPUBufferRecord& gpu_buffer_entry = it->second;
-    auto             access_id        = rand();
-    gpu_buffer_entry.access_ids.push_back(access_id); // save access id
-    gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
+    // get buffer entry
+    GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
+
+    // generate access id
+    auto access_id = rand();
+
+    // update buffer entry - add new access_id and update last activity timestamp
+    id_index.modify(it, [access_id](GPUBufferRecord& record) {
+      record.access_ids.push_back(access_id); // save access id
+      record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
+    });
 
     // init flatbuffers success response
     auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(response_builder,
                                                                  gpu_buffer_entry.gpu_device_index,
                                                                  &gpu_buffer_entry.ipc_handle,
-                                                                 it->second.size,
+                                                                 gpu_buffer_entry.size,
                                                                  access_id);
     auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder,
                                                              fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse,
@@ -321,7 +336,8 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   get_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req,
+                                     flatbuffers::FlatBufferBuilder&                    response_builder,
                                      std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -330,26 +346,27 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   {
     std::lock_guard<std::mutex> lock(buffers_mutex_);
 
-    // search for buffer by buffer_id uuid
-    auto it = buffers_.find(buffer_id);
-    if (it == buffers_.end()) {
+    // search for buffer by buffer_id uuid using id index
+    auto& id_index = buffers_.get<ByBufferId>();
+    auto  it       = id_index.find(buffer_id);
+    if (it == id_index.end()) {
       throw std::runtime_error(fmt::format("Buffer ID not found = {}", boost::uuids::to_string(buffer_id)));
     }
 
-    // get buffer entry in hashmap
-    GPUBufferRecord& gpu_buffer_entry = it->second;
+    // get buffer entry
+    GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
 
-    auto it2 = std::find(gpu_buffer_entry.access_ids.begin(), gpu_buffer_entry.access_ids.end(), req->access_id());
-    if (it2 == gpu_buffer_entry.access_ids.end()) {
-      spdlog::warn("Access ID not found");
+    // search for access id
+    auto access_id = std::find(gpu_buffer_entry.access_ids.begin(), gpu_buffer_entry.access_ids.end(), req->access_id());
+    if (access_id == gpu_buffer_entry.access_ids.end()) {
       throw std::runtime_error(fmt::format("Access ID not found = {}", req->access_id()));
     }
 
-    // remove access id
-    gpu_buffer_entry.access_ids.erase(it2);
-
-    // update last activity timestamp
-    gpu_buffer_entry.last_activity_timestamp = std::chrono::steady_clock::now();
+    // update buffer entry - add new access_id and update last activity timestamp
+    id_index.modify(it, [access_id](GPUBufferRecord& record) {
+      record.access_ids.erase(access_id); // delete access_id from list
+      record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
+    });
 
     // decrement access counter
     // gpu_buffer_entry.access_counter--;
@@ -365,7 +382,8 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   notify_done_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req,
+                                     flatbuffers::FlatBufferBuilder&                    response_builder,
                                      std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -374,14 +392,15 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
   {
     std::lock_guard<std::mutex> lock(buffers_mutex_);
 
-    // search for buffer by buffer_id uuid
-    auto it = buffers_.find(buffer_id);
-    if (it == buffers_.end()) {
+    // search for buffer by buffer_id uuid using id index
+    auto& id_index = buffers_.get<ByBufferId>();
+    auto  it       = id_index.find(buffer_id);
+    if (it == id_index.end()) {
       throw std::runtime_error(fmt::format("Buffer ID not found = {}", boost::uuids::to_string(buffer_id)));
     }
 
-    // get buffer entry in hashmap
-    GPUBufferRecord& gpu_buffer_entry = it->second;
+    // get buffer entry
+    GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
 
     // set device before free
     CudaUtils::SetDevice(gpu_buffer_entry.gpu_device_index);
@@ -394,7 +413,7 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
     expired_buffers_->Increment();
     allocated_buffers_->Set(buffers_.size());
 
-    // remove from hash map
+    // remove from buffers
     buffers_.erase(it);
   } // lock released here
 
@@ -461,28 +480,31 @@ void CudaIPCServer::cleanupExpiredBuffers() {
   auto                        now = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_); // lock buffers_mutex used to protect buffers_
 
-  //
-  for (auto it = buffers_.begin(); it != buffers_.end();) {
-    auto& record = it->second;
+  auto& exp_index   = buffers_.get<ByExpiration>();
+  auto  expired_end = exp_index.upper_bound(now);
+  for (auto it = exp_index.begin(); it != expired_end; /* increment inside loop */) {
+    // get buffer entry
+    GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
 
     // Only check buffers that use TTL expiration
-    if (record.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption && now >= record.expiration_timestamp) {
-      spdlog::info("Buffer expired. Releasing GPU memory. buffer_id = {}", boost::uuids::to_string(record.buffer_id));
+    if (gpu_buffer_entry.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
+      spdlog::info("Buffer expired. Releasing GPU memory. buffer_id = {}",
+                   boost::uuids::to_string(gpu_buffer_entry.buffer_id));
 
       // Free CUDA memory
-      CudaUtils::FreeDeviceBuffer(record.d_ptr);
+      CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
 
       // Update metrics before erasing
-      allocated_bytes_->Decrement(record.size);
+      allocated_bytes_->Decrement(gpu_buffer_entry.size);
       expired_buffers_->Increment();
 
-      // Erase the record and advance iterator safely
-      it = buffers_.erase(it);
+      // Erase safely and get next iterator
+      it = exp_index.erase(it);
 
       // Update allocated buffers metric
       allocated_buffers_->Set(buffers_.size());
     } else {
-      ++it;
+      ++it; // only increment if we didn't erase
     }
   }
 }

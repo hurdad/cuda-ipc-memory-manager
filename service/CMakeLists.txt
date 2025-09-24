@@ -9,6 +9,7 @@ add_executable(cuda-ipc-memory-manager-service
         src/CudaIPCServer.h
         src/GpuMetricsCollector.cpp
         src/GpuMetricsCollector.h
+        src/GPUBufferMultiIndex.h
 )
 
 target_link_libraries(cuda-ipc-memory-manager-service PRIVATE
