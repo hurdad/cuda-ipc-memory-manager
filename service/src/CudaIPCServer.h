@@ -57,7 +57,7 @@ private:
   std::atomic<bool>                             running_; // stop flag
   GPUBufferMultiIndex                           buffers_; // container that holds GPUBufferRecord
   std::mutex                                    buffers_mutex_; // <-- Protects access to buffers_
-  std::map<int32_t, size_t>                     max_gpu_total_memory_; // max gpu total memory mapped by gpu_device_index
+  std::unordered_map<int32_t, size_t>           max_gpu_allocated_memory_; // max gpu allocated memory mapped by gpu_device_index
 
   // Main server loop
   void run();
@@ -66,13 +66,17 @@ private:
   void cleanupExpiredBuffers();
 
   // Functions for handling individual request types
-  void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
+                          flatbuffers::FlatBufferBuilder&                     response_builder,
                           std::chrono::time_point<std::chrono::steady_clock>  start_timestamp);
-  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req,
+                       flatbuffers::FlatBufferBuilder&                    response_builder,
                        std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req,
+                        flatbuffers::FlatBufferBuilder&                    response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req,
+                        flatbuffers::FlatBufferBuilder&                    response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
 
   static boost::uuids::uuid generateUUID();
@@ -85,8 +89,8 @@ private:
   prometheus::Counter*                  errors_total_;
   prometheus::Counter*                  create_buffer_success_;
   prometheus::Counter*                  create_buffer_fail_;
-  prometheus::Gauge*                    allocated_buffers_;
-  prometheus::Gauge*                    allocated_bytes_;
+  std::unordered_map<int, prometheus::Gauge*> allocated_buffers_map_;
+  std::unordered_map<int, prometheus::Gauge*> allocated_bytes_map_;
   prometheus::Counter*                  expired_buffers_;
   prometheus::Histogram*                create_buffer_latency_;
   prometheus::Histogram*                get_buffer_latency_;

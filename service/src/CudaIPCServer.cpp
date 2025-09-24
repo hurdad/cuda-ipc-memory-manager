@@ -11,16 +11,16 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
       CudaUtils::SetDevice(cuda_gpu_device->cuda_gpu_index());
       CudaUtils::GetMemoryInfo(&freeMem, &totalMem);
 
-      // Check max memory allocation type
+      // Check max memory allocation type and set max_gpu_allocated_memory_
       auto max_allocation_type = cuda_gpu_device->max_memory_allocation_type();
       if (max_allocation_type) {
         switch (max_allocation_type) {
           case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxFixedMemoryBytes:
-            max_gpu_total_memory_[cuda_gpu_device->cuda_gpu_index()] = cuda_gpu_device->max_memory_allocation_as_MaxFixedMemoryBytes()->value();
+            max_gpu_allocated_memory_[cuda_gpu_device->cuda_gpu_index()] = cuda_gpu_device->max_memory_allocation_as_MaxFixedMemoryBytes()->value();
             break;
 
           case fbs::cuda::ipc::service::MemoryMaxAllocation_MaxGPUMemoryPercentage:
-            max_gpu_total_memory_[cuda_gpu_device->cuda_gpu_index()] =
+            max_gpu_allocated_memory_[cuda_gpu_device->cuda_gpu_index()] =
                 totalMem * cuda_gpu_device->max_memory_allocation_as_MaxGPUMemoryPercentage()->value();
             break;
 
@@ -242,15 +242,13 @@ void CudaIPCServer::run() {
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req,
                                        flatbuffers::FlatBufferBuilder&                     response_builder,
                                        std::chrono::time_point<std::chrono::steady_clock>  start_timestamp) {
-  // find total memory for requested gpu_device_index
-  auto it = max_gpu_total_memory_.find(req->gpu_device_index());
-  if (it == max_gpu_total_memory_.end()) {
-    throw std::runtime_error(fmt::format("GPU Device Not Found = {}", req->gpu_device_index()));
-  }
-
-  // check if we have enough memory left (allocated + requested > total mem)
-  if (allocated_bytes_->Value() + req->size() > it->second) {
-    throw std::runtime_error("Out of Memory: Not enough free memory to satisfy the request.");
+  // find max allocated memory for requested gpu_device_index
+  auto it = max_gpu_allocated_memory_.find(req->gpu_device_index());
+  if (it != max_gpu_allocated_memory_.end()) {
+    // check if we have enough memory left (allocated + requested > total mem)
+    if (allocated_bytes_->Value() + req->size() > it->second) {
+      throw std::runtime_error("Out of Memory: Not enough free memory to satisfy the request.");
+    }
   }
 
   // set device before allocate

@@ -40,9 +40,8 @@ union MemoryMaxAllocation {
 
 // Configuration for a single CUDA GPU device.
 table GPUDevice {
-  cuda_gpu_index: int (key);            // GPU device index as recognized by CUDA
-  max_memory_allocation: MemoryMaxAllocation (required);
-                                        // Memory allocation policy for this device
+  gpu_uuid: string (key, required);                       // Nvidia GPU UUID
+  max_memory_allocation: MemoryMaxAllocation (required);  // Memory allocation policy for this device
 }
 
 // ============================================================================
