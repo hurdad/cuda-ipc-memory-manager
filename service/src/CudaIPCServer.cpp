@@ -71,6 +71,12 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
                           .Register(*registry_)
                           .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
+  expire_buffers_latency_= &prometheus::BuildHistogram()
+                          .Name("cuda_ipc_expire_buffers_latency_seconds")
+                          .Help("Latency of cleanupExpiredBuffers function requests in seconds")
+                          .Register(*registry_)
+                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
 
@@ -440,16 +446,16 @@ void CudaIPCServer::expirationLoop(const uint32_t expiration_thread_interval_ms)
   // Main loop runs as long as the server is running
   while (running_) {
     // Record the start time of this iteration
-    auto start = std::chrono::steady_clock::now();
+    auto start_timestamp = std::chrono::steady_clock::now();
 
     // Perform cleanup of expired buffers
     cleanupExpiredBuffers();
 
-    // Record the end time after cleanup
-    auto end = std::chrono::steady_clock::now();
+    // Calculate how long the cleanupExpiredBuffers took
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_timestamp;
 
-    // Calculate how long the cleanup took
-    auto elapsed = end - start;
+    // metrics update
+    expire_buffers_latency_->Observe(elapsed.count());
 
     // Sleep for the remaining time to maintain a consistent interval
     // If cleanup took longer than the interval, skip sleeping
@@ -480,6 +486,7 @@ void CudaIPCServer::cleanupExpiredBuffers() {
   auto                        now = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(buffers_mutex_); // lock buffers_mutex used to protect buffers_
 
+  // lookup expired payload by index
   auto& exp_index   = buffers_.get<ByExpiration>();
   auto  expired_end = exp_index.upper_bound(now);
   for (auto it = exp_index.begin(); it != expired_end; /* increment inside loop */) {
@@ -490,6 +497,9 @@ void CudaIPCServer::cleanupExpiredBuffers() {
     if (gpu_buffer_entry.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
       spdlog::info("Buffer expired. Releasing GPU memory. buffer_id = {}",
                    boost::uuids::to_string(gpu_buffer_entry.buffer_id));
+
+      // Set CUDA device
+      CudaUtils::SetDevice(gpu_buffer_entry.gpu_device_index);
 
       // Free CUDA memory
       CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);

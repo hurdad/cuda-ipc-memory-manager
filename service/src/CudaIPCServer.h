@@ -6,7 +6,6 @@
 #include <atomic>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 #include <zmq.hpp>
 
@@ -38,44 +37,10 @@
 
 // Gpu Buffer Multi Index
 #include "GPUBufferMultiIndex.h"
-//
-// struct GPUBufferRecord {
-//   // GPU Buffer ID
-//   boost::uuids::uuid buffer_id;
-//
-//   // CUDA IPC handle for sharing GPU memory across processes (flatbuffers)
-//   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
-//
-//   // GPU device index that the buffer belongs to
-//   int gpu_device_index = 0;
-//
-//   // How to handle expiration of this buffer
-//   fbs::cuda::ipc::api::ExpirationOptions expiration_option = fbs::cuda::ipc::api::ExpirationOptions_NONE;
-//
-//   // Device pointer to the GPU memory
-//   void* d_ptr = nullptr;
-//
-//   // Size of the buffer in bytes
-//   size_t size = 0;
-//
-//   // Number of access counts
-//   // int32_t access_counter = 0;
-//
-//   // Creation Timestamp of the buffer
-//   std::chrono::steady_clock::time_point creation_timestamp;
-//
-//   // Timestamp of the last activity on this buffer
-//   std::chrono::steady_clock::time_point last_activity_timestamp;
-//
-//   // Timestamp of when to expire on this buffer
-//   std::chrono::steady_clock::time_point expiration_timestamp;
-//
-//   // list of current access ids
-//   std::vector<uint32_t> access_ids;
-// };
+
 
 class CudaIPCServer {
- public:
+public:
   CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration);
   ~CudaIPCServer();
 
@@ -83,17 +48,15 @@ class CudaIPCServer {
   void stop();
   void join();
 
- private:
-  const fbs::cuda::ipc::service::Configuration*                                            configuration_;
-  zmq::context_t                                                                           context_;
-  zmq::socket_t                                                                            socket_;
-  std::thread                                                                              server_thread_;
-  std::thread                                                                              expiration_thread_;
-  std::atomic<bool>                                                                        running_; // stop flag
-  //std::unordered_map<boost::uuids::uuid, GPUBufferRecord, boost::hash<boost::uuids::uuid>> buffers_;
-  GPUBufferMultiIndex buffers_;
-
-  std::mutex                                                                               buffers_mutex_; // <-- Protects access to buffers_
+private:
+  const fbs::cuda::ipc::service::Configuration* configuration_;
+  zmq::context_t                                context_;
+  zmq::socket_t                                 socket_;
+  std::thread                                   server_thread_;
+  std::thread                                   expiration_thread_;
+  std::atomic<bool>                             running_; // stop flag
+  GPUBufferMultiIndex                           buffers_; // container that holds GPUBufferRecord
+  std::mutex                                    buffers_mutex_; // <-- Protects access to buffers_
 
   // Main server loop
   void run();
@@ -103,16 +66,16 @@ class CudaIPCServer {
 
   // Functions for handling individual request types
   void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
-                          std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                          std::chrono::time_point<std::chrono::steady_clock>  start_timestamp);
+  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req, flatbuffers::FlatBufferBuilder& response_builder,
                        std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req, flatbuffers::FlatBufferBuilder& response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req, flatbuffers::FlatBufferBuilder& response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
 
   static boost::uuids::uuid generateUUID();
-  static bool                      setThreadRealtime(std::thread& t);
+  static bool               setThreadRealtime(std::thread& t);
 
   // Prometheus metrics
   std::shared_ptr<prometheus::Registry> registry_;
@@ -128,6 +91,7 @@ class CudaIPCServer {
   prometheus::Histogram*                get_buffer_latency_;
   prometheus::Histogram*                notify_done_latency_;
   prometheus::Histogram*                free_buffer_latency_;
+  prometheus::Histogram*                expire_buffers_latency_;
 };
 
 #endif // CUDA_UTILS_H
