@@ -2,7 +2,7 @@
 #include <boost/uuid/uuid.hpp>            // for boost::uuids::uuid
 #include <boost/uuid/uuid_generators.hpp> // for string_generator
 #include <iostream>
-#include "CudaIpcMemoryRequestAPI.h"
+#include "CudaIpcMemoryManagerAPI.h"
 
 // CUDA kernel: increment each element of an array by 1
 __global__ void incrementKernel(float* d, int n) {
@@ -15,7 +15,7 @@ __global__ void incrementKernel(float* d, int n) {
 int main(int argc, char** argv) {
     try {
         // Create an instance of the IPC memory manager API
-        cuda::ipc::api::CudaIpcMemoryRequestAPI api(
+        cuda::ipc::api::CudaIpcMemoryManagerAPI api(
             "ipc:///tmp/cuda-ipc-memory-manager-service.ipc"
         );
 

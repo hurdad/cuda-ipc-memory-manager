@@ -1,12 +1,12 @@
 #include <boost/uuid/uuid.hpp>            // for boost::uuids::uuid
 #include <boost/uuid/uuid_generators.hpp> // for string_generator
 #include <iostream>
-#include "CudaIpcMemoryRequestAPI.h"
+#include "CudaIpcMemoryManagerAPI.h"
 
 int main(int argc, char** argv) {
   try {
     // Create an instance of the IPC memory manager API
-    cuda::ipc::api::CudaIpcMemoryRequestAPI api(
+    cuda::ipc::api::CudaIpcMemoryManagerAPI api(
         "ipc:///tmp/cuda-ipc-memory-manager-service.ipc"
     );
 

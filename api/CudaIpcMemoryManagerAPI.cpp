@@ -1,39 +1,32 @@
-#include "CudaIpcMemoryRequestAPI.h"
+#include "CudaIpcMemoryManagerAPI.h"
 
 #include "UUIDConverter.hpp"
 #include "api/rpc_request_generated.h"
 #include "api/rpc_response_generated.h"
 
 namespace cuda::ipc::api {
-CudaIpcMemoryRequestAPI::CudaIpcMemoryRequestAPI(const std::string& endpoint) : context_(1), socket_(context_, zmq::socket_type::req) {
+CudaIpcMemoryManagerAPI::CudaIpcMemoryManagerAPI(const std::string& endpoint) : context_(1), socket_(context_, zmq::socket_type::req) {
   socket_.connect(endpoint);
   spdlog::cfg::load_env_levels();
 }
 
-CudaIpcMemoryRequestAPI::~CudaIpcMemoryRequestAPI() {
+CudaIpcMemoryManagerAPI::~CudaIpcMemoryManagerAPI() {
 }
 
-GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size,
-                                                           int32_t  gpu_device_index ,
-                                                           size_t   ttl              ,
-                                                           bool     zero_buffer      ) {
+GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size,
+                                                           int32_t  gpu_device_index,
+                                                           int32_t  access_count,
+                                                           size_t   ttl,
+                                                           bool     zero_buffer) {
   spdlog::info("Creating CUDA buffer of size {} bytes on device {}", size, gpu_device_index);
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder                                    builder;
-  flatbuffers::Offset<fbs::cuda::ipc::api::CreateCUDABufferRequest> req;
-  if (ttl > 0) {
-    auto ttl_opts = fbs::cuda::ipc::api::CreateTtlCreationOption(builder, ttl);
-    auto exp_opts = fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, ttl_opts.o);
-    req           = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
-                                                             size,
-                                                             gpu_device_index,
-                                                             exp_opts.o,
-                                                             zero_buffer);
-  } else {
-    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
-                                                             size, gpu_device_index,
-                                                             zero_buffer);
-  }
+  auto req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
+                                                           size,
+                                                           gpu_device_index,
+                                                           fbs::cuda::ipc::api::ExpirationOption(access_count, ttl),
+                                                           zero_buffer);
+
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
 
@@ -112,14 +105,14 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size,
 
   // build return struct GPUBuffer
   return GPUBuffer(d_ptr,
-    size,
-    util::UUIDConverter::toBoostUUID(*buffer_id),
-    access_id,
-    gpu_device_index);
+                   size,
+                   util::UUIDConverter::toBoostUUID(*buffer_id),
+                   access_id,
+                   gpu_device_index);
 }
 
-GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
-   spdlog::info("Getting CUDA buffer = {}",  boost::uuids::to_string(buffer_id));
+GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
+  spdlog::info("Getting CUDA buffer = {}", boost::uuids::to_string(buffer_id));
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
   auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
@@ -182,12 +175,12 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
     throw std::runtime_error("Received null access_id in response.");
   }
 
-  auto size    = get_response->size();
+  auto size = get_response->size();
   if (!size) {
     throw std::runtime_error("Received null size in response.");
   }
 
-  auto gpu_device_index    = get_response->gpu_device_index();
+  auto gpu_device_index = get_response->gpu_device_index();
   if (!gpu_device_index) {
     throw std::runtime_error("Received null gpu_device_index in response.");
   }
@@ -200,13 +193,13 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
 
   // build return struct GPUBuffer
   return GPUBuffer(d_ptr,
-    size,
-    buffer_id,
-    access_id,
-    gpu_device_index);
+                   size,
+                   buffer_id,
+                   access_id,
+                   gpu_device_index);
 }
 
-void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
+void CudaIpcMemoryManagerAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
   // close the gpu memory handle
   CudaUtils::CloseHandleToCudaMemory(gpu_buffer.getDataPtr());
 
@@ -261,7 +254,7 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
   // response is empty on success
 }
 
-void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
+void CudaIpcMemoryManagerAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
   spdlog::info("Free CUDA buffer = {}"); //, buffer_id.str());
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
@@ -312,6 +305,5 @@ void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buf
   assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse);
 
   // response is empty on success
-
 }
 } // namespace cuda::ipc::api

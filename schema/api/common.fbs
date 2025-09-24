@@ -25,30 +25,9 @@ struct CudaIPCHandle {
 }
 
 // ---------------------------------------------------------------------------
-// Expiration Strategies
+// Expiration Option
 // ---------------------------------------------------------------------------
-
-// Expire GPU buffer after a specified access count (includes CreateGPUBuffer)
-table AccessCountOption {
+struct ExpirationOption {
   access_count: uint64;  // Number of accesses before expiration
-}
-
-// Expire GPU buffer when time-to-live (TTL) since creation is reached
-table TtlCreationOption {
-  ttl: uint64;  // TTL in seconds
-}
-
-// ---------------------------------------------------------------------------
-// Union for expiration strategies
-// ---------------------------------------------------------------------------
-union ExpirationOptions {
-  AccessCountOption,
-  TtlCreationOption
-}
-
-// ---------------------------------------------------------------------------
-// Expiration Option Wrapper
-// ---------------------------------------------------------------------------
-table ExpirationOption {
-  option: ExpirationOptions (required);
+  ttl: uint64;           // TTL in seconds before expiration
 }

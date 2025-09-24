@@ -71,11 +71,11 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
                           .Register(*registry_)
                           .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
-  expire_buffers_latency_= &prometheus::BuildHistogram()
-                          .Name("cuda_ipc_expire_buffers_latency_seconds")
-                          .Help("Latency of cleanupExpiredBuffers function requests in seconds")
-                          .Register(*registry_)
-                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+  expire_buffers_latency_ = &prometheus::BuildHistogram()
+                             .Name("cuda_ipc_expire_buffers_latency_seconds")
+                             .Help("Latency of cleanupExpiredBuffers function requests in seconds")
+                             .Register(*registry_)
+                             .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
@@ -252,17 +252,20 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   new_entry.creation_timestamp      = std::chrono::steady_clock::now();
   new_entry.last_activity_timestamp = std::chrono::steady_clock::now();
 
+  // config expiration options
   if (req->expiration()) {
-    new_entry.expiration_option = req->expiration()->option_type();
-    if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
-      new_entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(
-                                           req->expiration()->option_as_TtlCreationOption()->ttl());
-      new_entry.expiration_option = fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption;
+    // set expiration timestamp in the future (now + ttl)
+    if (req->expiration()->ttl() && (req->expiration()->ttl() > 0)) {
+      new_entry.expiration_timestamp = std::chrono::steady_clock::now() + std::chrono::seconds(req->expiration()->ttl());
     }
 
-    // if (req->expiration()->option_type() == fbs::cuda::ipc::api::ExpirationOptions_AccessCountOption) {
-    //   entry.access_counter = req->expiration()->option_as_AccessCountOption()->aceess_count();
-    // }
+    // set access count
+    if (req->expiration()->access_count() && (req->expiration()->access_count() > 0)) {
+      new_entry.access_count = req->expiration()->access_count();
+    }
+
+    // copy struct
+    std::memcpy(&new_entry.expiration_option, req->expiration(), sizeof(new_entry.expiration_option));
   }
 
   // lock buffers_mutex used to protect buffers_
@@ -372,10 +375,11 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
     id_index.modify(it, [access_id](GPUBufferRecord& record) {
       record.access_ids.erase(access_id); // delete access_id from list
       record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
-    });
 
-    // decrement access counter
-    // gpu_buffer_entry.access_counter--;
+      // decrement access count if enabled
+      if (record.expiration_option.access_count() > 0)
+        record.access_count--;
+    });
   } // lock released here
 
   // init flatbuffers success response
@@ -484,37 +488,59 @@ void CudaIPCServer::cleanupExpiredBuffers() {
   spdlog::trace("cleanupExpiredBuffers");
 
   auto                        now = std::chrono::steady_clock::now();
-  std::lock_guard<std::mutex> lock(buffers_mutex_); // lock buffers_mutex used to protect buffers_
+  std::lock_guard<std::mutex> lock(buffers_mutex_);
 
-  // lookup expired payload by index
+  // --- TTL Expired Buffers ---
   auto& exp_index   = buffers_.get<ByExpiration>();
   auto  expired_end = exp_index.upper_bound(now);
+
   for (auto it = exp_index.begin(); it != expired_end; /* increment inside loop */) {
-    // get buffer entry
-    GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
+    GPUBufferRecord& buf = const_cast<GPUBufferRecord&>(*it);
 
-    // Only check buffers that use TTL expiration
-    if (gpu_buffer_entry.expiration_option == fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption) {
-      spdlog::info("Buffer expired. Releasing GPU memory. buffer_id = {}",
-                   boost::uuids::to_string(gpu_buffer_entry.buffer_id));
+    if (buf.expiration_option.ttl() > 0) {
+      spdlog::info("Buffer expired by TTL. Releasing GPU memory: {}",
+                   boost::uuids::to_string(buf.buffer_id));
 
-      // Set CUDA device
-      CudaUtils::SetDevice(gpu_buffer_entry.gpu_device_index);
+      CudaUtils::SetDevice(buf.gpu_device_index);
+      CudaUtils::FreeDeviceBuffer(buf.d_ptr);
+      buf.d_ptr = nullptr; // prevent dangling pointer
 
-      // Free CUDA memory
-      CudaUtils::FreeDeviceBuffer(gpu_buffer_entry.d_ptr);
-
-      // Update metrics before erasing
-      allocated_bytes_->Decrement(gpu_buffer_entry.size);
+      allocated_bytes_->Decrement(buf.size);
       expired_buffers_->Increment();
 
-      // Erase safely and get next iterator
-      it = exp_index.erase(it);
-
-      // Update allocated buffers metric
-      allocated_buffers_->Set(buffers_.size());
+      it = exp_index.erase(it); // erase safely
     } else {
-      ++it; // only increment if we didn't erase
+      ++it;
     }
   }
+
+  // Update metrics once after TTL cleanup
+  allocated_buffers_->Set(buffers_.size());
+
+  // --- Access-count Expired Buffers ---
+  auto& access_index = buffers_.get<ByAccessOptionAndCount>();
+
+  uint64_t min_allowed  = 1;
+  uint64_t current_zero = 0;
+
+  auto it = access_index.lower_bound(std::make_pair(min_allowed, current_zero));
+
+  while (it != access_index.end() && it->access_count == 0) {
+    GPUBufferRecord& buf = const_cast<GPUBufferRecord&>(*it);
+
+    spdlog::info("Buffer expired by access count. Releasing GPU memory: {}",
+                 boost::uuids::to_string(buf.buffer_id));
+
+    CudaUtils::SetDevice(buf.gpu_device_index);
+    CudaUtils::FreeDeviceBuffer(buf.d_ptr);
+    buf.d_ptr = nullptr;
+
+    allocated_bytes_->Decrement(buf.size);
+    expired_buffers_->Increment();
+
+    it = access_index.erase(it); // erase safely
+  }
+
+  // Update metrics once after access-index cleanup
+  allocated_buffers_->Set(buffers_.size());
 }
