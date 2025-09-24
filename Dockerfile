@@ -14,6 +14,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     cppzmq-dev \
     libcurl4-openssl-dev \
     zlib1g-dev \
+    libnvidia-ml-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir
@@ -38,6 +39,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libflatbuffers2 \
     libboost-program-options1.83.0 \
     libzmq5 \
+    libnvidia-ml-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
