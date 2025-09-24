@@ -2,22 +2,61 @@
 // File: service.fbs
 // Namespace: fbs.cuda.ipc.service
 // ---------------------------------------------------------------------------
-// FlatBuffers schema defining the configuration for the CUDA Inter-Process Communication (IPC) Memory Manager Service.
-// Includes GPU device selection and endpoints for ZeroMQ and Prometheus.
+// Description:
+// FlatBuffers schema defining the configuration for the CUDA Inter-Process
+// Communication (IPC) Memory Manager Service.
+//
+// Features:
+// - GPU device selection and memory allocation limits.
+// - Configuration of ZeroMQ endpoints for IPC communication.
+// - Configuration of Prometheus endpoint for metrics reporting.
 // ============================================================================
 
 namespace fbs.cuda.ipc.service;
 
-// ---------------------------------------------------------------------------
-// Service Configuration
-// ---------------------------------------------------------------------------
-// Contains parameters required to initialize and run the CUDA IPC service.
-// ---------------------------------------------------------------------------
-table Configuration {
-  gpu_device_index: uint8;      // Index of the GPU device to use
-  zmq_request_endpoint: string; // ZeroMQ REQUEST endpoint for IPC communication
-  prometheus_endpoint: string;  // HTTP endpoint for Prometheus metrics
+// ============================================================================
+// Memory Allocation Structures
+// ============================================================================
+
+// Represents a fixed amount of GPU memory (in bytes) that can be allocated.
+struct MaxFixedMemoryBytes {
+  value: uint64; // Fixed memory allocation limit in bytes
 }
 
-// Specify the root type of the FlatBuffer.
+// Represents a percentage of the GPU's total memory that can be allocated.
+struct MaxGPUMemoryPercentage {
+  value: float; // Memory allocation limit as a percentage (e.g., 0.75 = 75%)
+}
+
+// Union of possible memory allocation limit types.
+union MemoryMaxAllocation {
+  MaxFixedMemoryBytes,
+  MaxGPUMemoryPercentage
+}
+
+// ============================================================================
+// GPU Device Configuration
+// ============================================================================
+
+// Configuration for a single CUDA GPU device.
+table GPUDevice {
+  cuda_gpu_index: int (key);            // GPU device index as recognized by CUDA
+  max_memory_allocation: MemoryMaxAllocation (required);
+                                        // Memory allocation policy for this device
+}
+
+// ============================================================================
+// Service Configuration
+// ============================================================================
+
+// Root configuration for the CUDA IPC Memory Manager Service.
+table Configuration {
+  cuda_gpu_devices: [GPUDevice];           // List of CUDA GPU devices to manage
+  zmq_request_endpoint: string (required); // ZeroMQ endpoint for IPC requests
+  prometheus_endpoint: string (required);  // HTTP endpoint for Prometheus metrics
+  expiration_thread_interval_ms: uint = 1000; // Interval in milliseconds for the cleanup thread (default: 1000 ms)
+  set_realtime_priority: bool = true;         // Attempt to enable realtime thread priority
+}
+
+// Root type declaration for FlatBuffers.
 root_type Configuration;

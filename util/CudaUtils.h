@@ -1,68 +1,94 @@
 #ifndef CUDA_UTILS_H
 #define CUDA_UTILS_H
 
-#include "api/common_generated.h"
+#include "api/common_generated.h" // for fbs::cuda::ipc::api::CudaIPCHandle
 
+/**
+ * Macro to wrap CUDA API calls.
+ * If the CUDA call fails, it throws a std::runtime_error with a descriptive message
+ * including file and line number.
+ *
+ * Usage:
+ *   CUDA_CHECK(cudaMalloc(&ptr, size));
+ */
+#define CUDA_CHECK(call) do {                                 \
+    cudaError_t status = (call);                              \
+    if (status != cudaSuccess) {                               \
+        throw std::runtime_error(                              \
+            std::string("[CudaUtils] CUDA error at ") +        \
+            __FILE__ + ":" + std::to_string(__LINE__) + " - " + \
+            cudaGetErrorString(status));                       \
+    }                                                          \
+} while (0)
+
+/**
+ * Utility class for CUDA device management, memory allocation,
+ * memory transfers, and CUDA IPC operations.
+ */
 class CudaUtils {
 public:
   /**
-   * @brief Initalize CUDA device.
-   * @param device_id
+   * Set the active CUDA device by ID.
+   * @param device_id The CUDA device ID to select.
+   * @throws std::runtime_error if cudaSetDevice fails.
    */
-  static void InitDevice(const int device_id) ;
+  static void SetDevice(int device_id);
 
   /**
-   * @brief Allocates a buffer on the CUDA device.
-   * @param numBytes Number of bytes to allocate.
-   * @return Pointer to the device buffer, or nullptr on failure.
-   */
-  static void* AllocDeviceBuffer(size_t numBytes);
+    * Allocate a device buffer of the given size in bytes.
+    * @param numBytes Number of bytes to allocate.
+    * @param zeroInitialize If true, initializes the buffer to zero.
+    * @return Pointer to the allocated device memory.
+    * @throws std::runtime_error if cudaMalloc or cudaMemset fails.
+    */
+  static void* AllocDeviceBuffer(size_t numBytes, bool zeroInitialize = false);
 
   /**
-   * @brief Frees a previously allocated device buffer.
-   * @param d_buffer Pointer to the device buffer.
+   * Free a previously allocated device buffer.
+   * @param d_buffer Pointer to device memory to free.
+   * @throws std::runtime_error if cudaFree fails.
    */
   static void FreeDeviceBuffer(void* d_buffer);
 
   /**
-   * @brief Copies data from host to device.
+   * Copy memory from host to device.
    * @param d_buffer Device buffer pointer.
    * @param h_buffer Host buffer pointer.
    * @param numBytes Number of bytes to copy.
-   * @return True if successful, false otherwise.
+   * @throws std::runtime_error if pointers are null or cudaMemcpy fails.
    */
-  static bool CopyToDevice(void* d_buffer, const void* h_buffer, size_t numBytes);
+  static void CopyToDevice(void* d_buffer, const void* h_buffer, size_t numBytes);
 
   /**
-   * @brief Copies data from device to host.
+   * Copy memory from device to host.
    * @param h_buffer Host buffer pointer.
    * @param d_buffer Device buffer pointer.
    * @param numBytes Number of bytes to copy.
-   * @return True if successful, false otherwise.
+   * @throws std::runtime_error if pointers are null or cudaMemcpy fails.
    */
-  static bool CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes);
+  static void CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes);
 
   /**
-   * @brief Creates a FlatBuffers CUDA IPC handle from a device pointer.
-   * @param d_ptr Device pointer.
-   * @return FlatBuffers CudaIPCHandle.
-   * @throws std::runtime_error if CUDA IPC handle creation fails.
+   * Create a CUDA IPC memory handle for sharing device memory between processes.
+   * @param d_ptr Pointer to device memory.
+   * @return Flatbuffers-wrapped IPC handle.
+   * @throws std::runtime_error if cudaIpcGetMemHandle fails.
    */
   static fbs::cuda::ipc::api::CudaIPCHandle GetCudaMemoryHandle(void* d_ptr);
 
   /**
-   * @brief Opens a CUDA IPC handle and returns the device pointer.
-   * @param cuda_ipc_handle FlatBuffers CudaIPCHandle.
-   * @return Device pointer corresponding to the IPC handle.
-   * @throws std::runtime_error if opening the IPC handle fails.
+   * Open a CUDA IPC handle in the current process.
+   * @param cuda_ipc_handle IPC handle from another process.
+   * @return Pointer to device memory mapped in this process.
+   * @throws std::runtime_error if cudaIpcOpenMemHandle fails.
    */
   static void* OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle);
 
   /**
- * @brief Close a CUDA IPC handle
-  * @param d_ptr Device pointer.
- * @throws std::runtime_error if opening the IPC handle fails.
- */
+   * Close a previously opened CUDA IPC handle.
+   * @param d_ptr Pointer returned by OpenHandleToCudaMemory.
+   * @throws std::runtime_error if cudaIpcCloseMemHandle fails.
+   */
   static void CloseHandleToCudaMemory(void* d_ptr);
 };
 

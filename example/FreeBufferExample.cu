@@ -1,19 +1,31 @@
 #include <boost/uuid/uuid.hpp>            // for boost::uuids::uuid
 #include <boost/uuid/uuid_generators.hpp> // for string_generator
 #include <iostream>
-
 #include "CudaIpcMemoryRequestAPI.h"
 
 int main(int argc, char** argv) {
-  cuda::ipc::api::CudaIpcMemoryRequestAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
-  boost::uuids::string_generator          gen;
+  try {
+    // Create an instance of the IPC memory manager API
+    cuda::ipc::api::CudaIpcMemoryRequestAPI api(
+        "ipc:///tmp/cuda-ipc-memory-manager-service.ipc"
+    );
 
-  // Parse the string into a boost::uuids::uuid
-  boost::uuids::uuid buffer_id  = gen("bf0b566f-f5b5-14b0-3868-eff252ba4301");
+    // Generator to parse UUID strings
+    boost::uuids::string_generator gen;
 
-  // free cuda buffer
-  api.FreeCUDABufferRequest(buffer_id);
+    // Parse the string into a boost::uuids::uuid
+    boost::uuids::uuid buffer_id = gen("bf0b566f-f5b5-14b0-3868-eff252ba4301");
 
-  std::cout << "Exiting... " << std::endl;
+    // Free the GPU buffer associated with the given UUID
+    api.FreeCUDABufferRequest(buffer_id);
+
+    std::cout << "GPU buffer freed successfully." << std::endl;
+  }
+  catch (const std::exception& e) {
+    // Print any exceptions that occur
+    std::cerr << "Exception: " << e.what() << std::endl;
+  }
+
+  std::cout << "Exiting..." << std::endl;
   return 0;
 }

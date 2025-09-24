@@ -5,88 +5,61 @@
 #include <stdexcept>
 #include <cstring>
 
-
-void CudaUtils::InitDevice(const int device_id) {
-  cudaError_t status = cudaSetDevice(device_id);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaSetDevice failed: " << cudaGetErrorString(status) << "\n";
-    throw std::runtime_error("cudaSetDevice failed");
-  }
-
+void CudaUtils::SetDevice(int device_id) {
+  // Set the current CUDA device; throws on failure
+  CUDA_CHECK(cudaSetDevice(device_id));
   std::cout << "[CudaUtils] Set device to " << device_id << "\n";
 }
 
-void* CudaUtils::AllocDeviceBuffer(size_t numBytes) {
-  void*       d_buffer = nullptr;
-  cudaError_t status   = cudaMalloc(&d_buffer, numBytes);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaMalloc failed for " << numBytes
-        << " bytes: " << cudaGetErrorString(status) << "\n";
-    return nullptr;
+void* CudaUtils::AllocDeviceBuffer(size_t numBytes, bool zeroInitialize) {
+  void* d_buffer = nullptr;
+  // Allocate device memory; throws on failure
+  CUDA_CHECK(cudaMalloc(&d_buffer, numBytes));
+
+  // Optionally zero-initialize the buffer
+  if (zeroInitialize) {
+    CUDA_CHECK(cudaMemset(d_buffer, 0, numBytes));
+    std::cout << "[CudaUtils] Zero-initialized device buffer at " << d_buffer
+              << " (" << numBytes << " bytes)\n";
+  } else {
+    std::cout << "[CudaUtils] Allocated device buffer at " << d_buffer
+              << " (" << numBytes << " bytes)\n";
   }
 
-  std::cout << "[CudaUtils] Allocated device buffer at " << d_buffer
-      << " (" << numBytes << " bytes)\n";
   return d_buffer;
 }
 
 void CudaUtils::FreeDeviceBuffer(void* d_buffer) {
   if (!d_buffer) return;
-
-  cudaError_t status = cudaFree(d_buffer);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaFree failed for buffer " << d_buffer
-        << ": " << cudaGetErrorString(status) << "\n";
-  } else {
-    std::cout << "[CudaUtils] Freed device buffer at " << d_buffer << "\n";
-  }
+  // Free device memory; throws on failure
+  CUDA_CHECK(cudaFree(d_buffer));
+  std::cout << "[CudaUtils] Freed device buffer at " << d_buffer << "\n";
 }
 
-bool CudaUtils::CopyToDevice(void* d_buffer, const void* h_buffer, size_t numBytes) {
-  if (!d_buffer || !h_buffer) {
-    std::cerr << "[CudaUtils] CopyToDevice failed: nullptr argument\n";
-    return false;
-  }
-
-  cudaError_t status = cudaMemcpy(d_buffer, h_buffer, numBytes, cudaMemcpyHostToDevice);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaMemcpy HtoD failed: " << cudaGetErrorString(status) << "\n";
-    return false;
-  }
-
-  std::cout << "[CudaUtils] Copied " << numBytes << " bytes from host to device ("
-      << d_buffer << ")\n";
-  return true;
+void CudaUtils::CopyToDevice(void* d_buffer, const void* h_buffer, size_t numBytes) {
+  if (!d_buffer || !h_buffer)
+    throw std::runtime_error("[CudaUtils] CopyToDevice failed: nullptr argument");
+  // Copy from host to device; throws on failure
+  CUDA_CHECK(cudaMemcpy(d_buffer, h_buffer, numBytes, cudaMemcpyHostToDevice));
+  std::cout << "[CudaUtils] Copied " << numBytes << " bytes from host to device (" << d_buffer << ")\n";
 }
 
-bool CudaUtils::CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes) {
-  if (!h_buffer || !d_buffer) {
-    std::cerr << "[CudaUtils] CopyToHost failed: nullptr argument\n";
-    return false;
-  }
-
-  cudaError_t status = cudaMemcpy(h_buffer, d_buffer, numBytes, cudaMemcpyDeviceToHost);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaMemcpy DtoH failed: " << cudaGetErrorString(status) << "\n";
-    return false;
-  }
-
-  std::cout << "[CudaUtils] Copied " << numBytes << " bytes from device to host ("
-      << d_buffer << ")\n";
-  return true;
+void CudaUtils::CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes) {
+  if (!h_buffer || !d_buffer)
+    throw std::runtime_error("[CudaUtils] CopyToHost failed: nullptr argument");
+  // Copy from device to host; throws on failure
+  CUDA_CHECK(cudaMemcpy(h_buffer, d_buffer, numBytes, cudaMemcpyDeviceToHost));
+  std::cout << "[CudaUtils] Copied " << numBytes << " bytes from device to host (" << d_buffer << ")\n";
 }
 
 fbs::cuda::ipc::api::CudaIPCHandle CudaUtils::GetCudaMemoryHandle(void* d_ptr) {
   cudaIpcMemHandle_t handle;
-  cudaError_t        status = cudaIpcGetMemHandle(&handle, d_ptr);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaIpcGetMemHandle failed: " << cudaGetErrorString(status) << "\n";
-    throw std::runtime_error("cudaIpcGetMemHandle failed");
-  }
+  // Create IPC handle for device memory; throws on failure
+  CUDA_CHECK(cudaIpcGetMemHandle(&handle, d_ptr));
 
   std::cout << "[CudaUtils] Created CUDA IPC handle for device pointer " << d_ptr << "\n";
 
-  // Convert CUDA handle to Flatbuffers handle
+  // Convert CUDA handle to Flatbuffers span
   flatbuffers::span<const uint8_t, 64> fb_span(
       reinterpret_cast<const uint8_t*>(&handle), sizeof(handle)
       );
@@ -97,26 +70,20 @@ void* CudaUtils::OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle
   cudaIpcMemHandle_t handle;
   static_assert(sizeof(handle) <= sizeof(cuda_ipc_handle),
                 "Array size is too small for cudaIpcMemHandle_t");
+
+  // Copy Flatbuffers data to CUDA handle
   std::memcpy(&handle, &cuda_ipc_handle, sizeof(handle));
 
-  void*       d_ptr  = nullptr;
-  cudaError_t status = cudaIpcOpenMemHandle(&d_ptr, handle, cudaIpcMemLazyEnablePeerAccess);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaIpcOpenMemHandle failed: " << cudaGetErrorString(status) << "\n";
-    throw std::runtime_error("cudaIpcOpenMemHandle failed");
-  }
+  void* d_ptr = nullptr;
+  // Open IPC handle; throws on failure
+  CUDA_CHECK(cudaIpcOpenMemHandle(&d_ptr, handle, cudaIpcMemLazyEnablePeerAccess));
 
   std::cout << "[CudaUtils] Opened CUDA IPC handle, device pointer: " << d_ptr << "\n";
   return d_ptr;
 }
 
 void CudaUtils::CloseHandleToCudaMemory(void* d_ptr) {
-  // close ipc gpu memory
-  cudaError_t status = cudaIpcCloseMemHandle(d_ptr);
-  if (status != cudaSuccess) {
-    std::cerr << "[CudaUtils] cudaIpcCloseMemHandle failed: " << cudaGetErrorString(status) << "\n";
-    throw std::runtime_error("cudaIpcCloseMemHandle failed");
-  }
-
-  std::cout << "[CudaUtils] Close CUDA IPC handle \n";
+  // Close IPC handle; throws on failure
+  CUDA_CHECK(cudaIpcCloseMemHandle(d_ptr));
+  std::cout << "[CudaUtils] Closed CUDA IPC handle\n";
 }

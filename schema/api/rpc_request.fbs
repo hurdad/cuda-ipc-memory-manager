@@ -12,31 +12,37 @@ namespace fbs.cuda.ipc.api;
 // ---------------------------------------------------------------------------
 // CUDA Buffer Creation Request
 // ---------------------------------------------------------------------------
+// Represents a request to create a CUDA buffer on a specific GPU.
+// This request is typically sent by a client to the CUDA IPC service.
+// ---------------------------------------------------------------------------
 table CreateCUDABufferRequest {
-  size: uint64;
-  expiration: ExpirationOption;
+  size: uint64;                 // Size of the buffer in bytes to be allocated on the GPU
+  gpu_device_index: int;        // Index of the target GPU device where the buffer should be created
+  expiration: ExpirationOption; // Expiration policy for the buffer, defined in common.fbs
+  zero_buffer: bool;            // Write zeros to the new buffer cudaMemset(ptr, 0, size)
 }
 
 // ---------------------------------------------------------------------------
 // CUDA Buffer Retrieval Request
 // ---------------------------------------------------------------------------
 table GetCUDABufferRequest {
-  buffer_id: UUID (required);
+  buffer_id: UUID (required);  // Buffer ID (UUID) to query and return raw gpu memory pointer
 }
 
 // ---------------------------------------------------------------------------
 // Notify Buffer Usage Completion Request
 // ---------------------------------------------------------------------------
 table NotifyDoneRequest {
-  buffer_id: UUID (required);
-  access_id: uint32;
+  buffer_id: UUID (required);  // Buffer ID (UUID) to notify access completed
+  access_id: uint32;           // Access ID - included in CudaBufferResponse
 }
 
 // ---------------------------------------------------------------------------
 // CUDA Buffer Free Request
 // ---------------------------------------------------------------------------
 table FreeCUDABufferRequest {
-  buffer_id: UUID (required);
+  buffer_id: UUID (required); // Buffer ID (UUID) to free
+  gpu_device_index: int;      // Index of the GPU device where the buffer was allocated
 }
 
 // ---------------------------------------------------------------------------

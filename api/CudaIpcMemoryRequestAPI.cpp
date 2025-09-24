@@ -13,18 +13,26 @@ CudaIpcMemoryRequestAPI::CudaIpcMemoryRequestAPI(const std::string& endpoint) : 
 CudaIpcMemoryRequestAPI::~CudaIpcMemoryRequestAPI() {
 }
 
-GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t ttl) {
-  spdlog::info("Creating CUDA buffer of size {} bytes", size);
+GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(uint64_t size,
+                                                           int32_t  gpu_device_index ,
+                                                           size_t   ttl              ,
+                                                           bool     zero_buffer      ) {
+  spdlog::info("Creating CUDA buffer of size {} bytes on device {}", size, gpu_device_index);
   // Build FlatBuffer request
-  flatbuffers::FlatBufferBuilder builder;
-
+  flatbuffers::FlatBufferBuilder                                    builder;
   flatbuffers::Offset<fbs::cuda::ipc::api::CreateCUDABufferRequest> req;
   if (ttl > 0) {
     auto ttl_opts = fbs::cuda::ipc::api::CreateTtlCreationOption(builder, ttl);
     auto exp_opts = fbs::cuda::ipc::api::CreateExpirationOption(builder, fbs::cuda::ipc::api::ExpirationOptions_TtlCreationOption, ttl_opts.o);
-    req           = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size, exp_opts.o);
+    req           = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
+                                                             size,
+                                                             gpu_device_index,
+                                                             exp_opts.o,
+                                                             zero_buffer);
   } else {
-    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size);
+    req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder,
+                                                             size, gpu_device_index,
+                                                             zero_buffer);
   }
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
@@ -44,27 +52,47 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t t
 
   spdlog::info("Received response : {}", response_msg.size());
 
+  // get response buffer
+  auto response_buf  = response_msg.data();
+  auto response_size = response_msg.size();
+
+  // verify flatbuffers request
+  flatbuffers::Verifier verifier(static_cast<const uint8_t*>(response_buf), response_size);
+  if (!fbs::cuda::ipc::api::VerifyRPCRequestMessageBuffer(verifier)) {
+    throw std::runtime_error("Invalid IPC Request Message");
+  }
   // Parse response
   auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
   if (!rpc_response) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
+  // check for ErrorResponse type
+  if (rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_ErrorResponse) {
+    auto error_response = rpc_response->response_as_ErrorResponse();
+    if (!error_response) {
+      throw std::runtime_error("Invalid ErrorResponse in RPC response.");
+    }
+    throw std::runtime_error(error_response->message()->str());
+  }
+
+  // parse CreateCUDABufferResponse
   assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse);
   auto create_response = rpc_response->response_as_CreateCUDABufferResponse();
   if (!create_response) {
     throw std::runtime_error("Invalid CreateCUDABufferResponse in RPC response.");
   }
 
-  // check response success
-  if (!create_response->success()) {
-    throw std::runtime_error("Failed to create CUDA buffer : "); // + create_response->error()->str());
-  }
-
   auto buffer_id = create_response->buffer_id();
   if (!buffer_id) {
     throw std::runtime_error("Received null buffer_id in response.");
   }
+
+  // make sure response device index matches the requested index
+  assert(gpu_device_index == create_response->gpu_device_index());
+
+  // make sure response size matches the requested size
+  assert(size == create_response->size());
 
   auto ipc_handle = create_response->ipc_handle();
   if (!ipc_handle) {
@@ -76,19 +104,26 @@ GPUBuffer CudaIpcMemoryRequestAPI::CreateCUDABufferRequest(size_t size, size_t t
     throw std::runtime_error("Received null access_id in response.");
   }
 
+  // set cuda device before we get memory handle
+  CudaUtils::SetDevice(gpu_device_index);
+
   // get device pointer from ipc_handle
   void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
 
   // build return struct GPUBuffer
-  return GPUBuffer(util::UUIDConverter::toBoostUUID(*buffer_id), access_id, d_ptr, size);
+  return GPUBuffer(d_ptr,
+    size,
+    util::UUIDConverter::toBoostUUID(*buffer_id),
+    access_id,
+    gpu_device_index);
 }
 
 GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
-  // spdlog::info("Getting CUDA buffer = {}", buffer_id.str());
+   spdlog::info("Getting CUDA buffer = {}",  boost::uuids::to_string(buffer_id));
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
-  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
-  auto                           req          = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
+  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
+  auto req = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetCUDABufferRequest, req.o);
   builder.Finish(msg);
 
@@ -105,21 +140,36 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
     throw std::runtime_error("Failed to receive response from server.");
   }
 
+  // get response buffer
+  auto response_buf  = response_msg.data();
+  auto response_size = response_msg.size();
+
+  // verify flatbuffers request
+  flatbuffers::Verifier verifier(static_cast<const uint8_t*>(response_buf), response_size);
+  if (!fbs::cuda::ipc::api::VerifyRPCRequestMessageBuffer(verifier)) {
+    throw std::runtime_error("Invalid IPC Request Message");
+  }
+
   // Parse response
   auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
   if (!rpc_response) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
-  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse);
-  auto get_response = rpc_response->response_as_GetCUDABufferResponse();
-  if (!get_response) {
-    throw std::runtime_error("Invalid GetCUDABufferResponse in RPC response.");
+  // check for ErrorResponse type
+  if (rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_ErrorResponse) {
+    auto error_response = rpc_response->response_as_ErrorResponse();
+    if (!error_response) {
+      throw std::runtime_error("Invalid ErrorResponse in RPC response.");
+    }
+    throw std::runtime_error(error_response->message()->str());
   }
 
-  // check response success
-  if (!get_response->success()) {
-    throw std::runtime_error("Failed to get CUDA buffer : "); //+ get_response->error()->str());
+  // parse GetCUDABufferResponse
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse);
+  auto get_response = rpc_response->response_as_CreateCUDABufferResponse();
+  if (!get_response) {
+    throw std::runtime_error("Invalid GetCUDABufferResponse in RPC response.");
   }
 
   auto ipc_handle = get_response->ipc_handle();
@@ -128,13 +178,32 @@ GPUBuffer CudaIpcMemoryRequestAPI::GetCUDABufferRequest(const boost::uuids::uuid
   }
 
   auto access_id = get_response->access_id();
-  auto size      = get_response->size();
+  if (!access_id) {
+    throw std::runtime_error("Received null access_id in response.");
+  }
+
+  auto size    = get_response->size();
+  if (!size) {
+    throw std::runtime_error("Received null size in response.");
+  }
+
+  auto gpu_device_index    = get_response->gpu_device_index();
+  if (!gpu_device_index) {
+    throw std::runtime_error("Received null gpu_device_index in response.");
+  }
+
+  // set cuda device before we get memory handle
+  CudaUtils::SetDevice(gpu_device_index);
 
   // get device pointer from ipc_handle
   void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
 
   // build return struct GPUBuffer
-  return GPUBuffer(buffer_id, access_id, d_ptr, size);
+  return GPUBuffer(d_ptr,
+    size,
+    buffer_id,
+    access_id,
+    gpu_device_index);
 }
 
 void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
@@ -143,8 +212,8 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
 
   // Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
-  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
-  auto                           req          = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
+  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
+  auto req = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest, req.o);
   builder.Finish(msg);
 
@@ -161,30 +230,43 @@ void CudaIpcMemoryRequestAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
     throw std::runtime_error("Failed to receive response from server.");
   }
 
+  // get response buffer
+  auto response_buf  = response_msg.data();
+  auto response_size = response_msg.size();
+
+  // verify flatbuffers request
+  flatbuffers::Verifier verifier(static_cast<const uint8_t*>(response_buf), response_size);
+  if (!fbs::cuda::ipc::api::VerifyRPCRequestMessageBuffer(verifier)) {
+    throw std::runtime_error("Invalid IPC Request Message");
+  }
+
   // Parse response
   auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
   if (!rpc_response) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
-  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse);
-  auto notify_response = rpc_response->response_as_NotifyDoneResponse();
-  if (!notify_response) {
-    throw std::runtime_error("Invalid NotifyDoneResponse in RPC response.");
+  // check for ErrorResponse type
+  if (rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_ErrorResponse) {
+    auto error_response = rpc_response->response_as_ErrorResponse();
+    if (!error_response) {
+      throw std::runtime_error("Invalid ErrorResponse in RPC response.");
+    }
+    throw std::runtime_error(error_response->message()->str());
   }
 
-  // check response success
-  if (!notify_response->success()) {
-    throw std::runtime_error("Failed to notify Done : " + notify_response->error()->str());
-  }
+  // assert type
+  assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_NotifyDoneResponse);
+
+  // response is empty on success
 }
 
 void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buffer_id) {
   spdlog::info("Free CUDA buffer = {}"); //, buffer_id.str());
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
-  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
-  auto                           req          = fbs::cuda::ipc::api::CreateFreeCUDABufferRequest(builder, &fb_buffer_id);
+  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
+  auto req = fbs::cuda::ipc::api::CreateFreeCUDABufferRequest(builder, &fb_buffer_id);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_FreeCUDABufferRequest, req.o);
   builder.Finish(msg);
 
@@ -201,22 +283,35 @@ void CudaIpcMemoryRequestAPI::FreeCUDABufferRequest(const boost::uuids::uuid buf
     throw std::runtime_error("Failed to receive response from server.");
   }
 
+  // get response buffer
+  auto response_buf  = response_msg.data();
+  auto response_size = response_msg.size();
+
+  // verify flatbuffers request
+  flatbuffers::Verifier verifier(static_cast<const uint8_t*>(response_buf), response_size);
+  if (!fbs::cuda::ipc::api::VerifyRPCRequestMessageBuffer(verifier)) {
+    throw std::runtime_error("Invalid IPC Request Message");
+  }
+
   // Parse response
   auto rpc_response = fbs::cuda::ipc::api::GetRPCResponseMessage(response_msg.data());
   if (!rpc_response) {
     throw std::runtime_error("Failed to parse RPC response message.");
   }
 
+  // check for ErrorResponse type
+  if (rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_ErrorResponse) {
+    auto error_response = rpc_response->response_as_ErrorResponse();
+    if (!error_response) {
+      throw std::runtime_error("Invalid ErrorResponse in RPC response.");
+    }
+    throw std::runtime_error(error_response->message()->str());
+  }
+
+  // assert type
   assert(rpc_response->response_type() == fbs::cuda::ipc::api::RPCResponse_FreeCUDABufferResponse);
-  auto get_response = rpc_response->response_as_FreeCUDABufferResponse();
-  if (!get_response) {
-    throw std::runtime_error("Invalid FreeCUDABufferResponse in RPC response.");
-  }
 
-  // check response success
-  if (!get_response->success()) {
-    throw std::runtime_error("Failed to get CUDA buffer : "); //+ get_response->error()->str());
-  }
+  // response is empty on success
+
 }
-
 } // namespace cuda::ipc::api

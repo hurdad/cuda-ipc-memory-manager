@@ -7,7 +7,6 @@ add_executable(create-buffer-example
 
 target_link_libraries(create-buffer-example PRIVATE
         cuda-ipc-memory-manager-api
-
 )
 
 add_executable(get-buffer-example

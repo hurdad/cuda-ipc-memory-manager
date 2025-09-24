@@ -13,38 +13,42 @@ namespace fbs.cuda.ipc.api;
 // Response for buffer creation
 // ---------------------------------------------------------------------------
 table CreateCUDABufferResponse {
-  buffer_id: UUID;
-  ipc_handle: CudaIPCHandle;
-  access_id: uint32;
-  success: bool;
-  error: string;
+  gpu_device_index: int;             // GPU device index where the buffer resides
+  buffer_id: UUID (required);        // Unique identifier for the created CUDA buffer
+  ipc_handle: CudaIPCHandle (required); // IPC handle to share the buffer across processes
+  size: uint64;                      // Size of the buffer in bytes
+  access_id: uint32;                 // Access ID associated with the buffer
 }
 
 // ---------------------------------------------------------------------------
 // Response for buffer retrieval
 // ---------------------------------------------------------------------------
 table GetCUDABufferResponse {
-  ipc_handle: CudaIPCHandle;
-  size: uint64;
-  access_id: uint32;
-  success: bool;
-  error: string;
+  gpu_device_index: int;             // GPU device index where the buffer resides
+  ipc_handle: CudaIPCHandle;         // IPC handle to access the requested buffer
+  size: uint64;                      // Size of the buffer in bytes
+  access_id: uint32;                 // Access ID for the buffer
 }
 
 // ---------------------------------------------------------------------------
 // Response for notify done
 // ---------------------------------------------------------------------------
 table NotifyDoneResponse {
-  success: bool;
-  error: string;
+  // No fields required; used to acknowledge completion of an operation
 }
 
 // ---------------------------------------------------------------------------
 // Response for buffer free
 // ---------------------------------------------------------------------------
 table FreeCUDABufferResponse {
-  success: bool;
-  error: string;
+  // No fields required; used to acknowledge buffer release
+}
+
+// ---------------------------------------------------------------------------
+// Error Response
+// ---------------------------------------------------------------------------
+table ErrorResponse {
+   message: string; // Error message response
 }
 
 // ---------------------------------------------------------------------------
@@ -54,13 +58,15 @@ union RPCResponse {
   CreateCUDABufferResponse,
   GetCUDABufferResponse,
   NotifyDoneResponse,
-  FreeCUDABufferResponse
+  FreeCUDABufferResponse,
+  ErrorResponse
 }
 
 // ---------------------------------------------------------------------------
 // Root type for RPC response messages
 // ---------------------------------------------------------------------------
 table RPCResponseMessage {
-  response: RPCResponse (required);
+  response: RPCResponse (required); // The actual RPC response payload
 }
+
 root_type RPCResponseMessage;

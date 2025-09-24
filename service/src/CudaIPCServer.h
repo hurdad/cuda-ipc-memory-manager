@@ -40,6 +40,9 @@ struct GPUBufferRecord {
   // CUDA IPC handle for sharing GPU memory across processes (flatbuffers)
   fbs::cuda::ipc::api::CudaIPCHandle ipc_handle;
 
+  // GPU device index that the buffer belongs to
+  int gpu_device_index = 0;
+
   // How to handle expiration of this buffer
   fbs::cuda::ipc::api::ExpirationOptions expiration_option = fbs::cuda::ipc::api::ExpirationOptions_NONE;
 
@@ -87,7 +90,7 @@ class CudaIPCServer {
   // Main server loop
   void run();
   // Expiration thread loop
-  void expirationLoop();
+  void expirationLoop(uint32_t expiration_thread_interval_ms);
   void cleanupExpiredBuffers();
 
   // Functions for handling individual request types
@@ -101,12 +104,13 @@ class CudaIPCServer {
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
 
   static boost::uuids::uuid generateUUID();
-  bool                      setThreadRealtime(std::thread& t);
+  static bool                      setThreadRealtime(std::thread& t);
 
   // Prometheus metrics
   std::shared_ptr<prometheus::Registry> registry_;
   std::unique_ptr<prometheus::Exposer>  exposer_;
   prometheus::Counter*                  requests_total_;
+  prometheus::Counter*                  errors_total_;
   prometheus::Counter*                  create_buffer_success_;
   prometheus::Counter*                  create_buffer_fail_;
   prometheus::Gauge*                    allocated_buffers_;
