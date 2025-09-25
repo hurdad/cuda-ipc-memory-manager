@@ -64,7 +64,7 @@ std::vector<prometheus::MetricFamily> GpuMetricsCollector::Collect() const {
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(device, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
-      // Get driver version
+      // NVML driver version
       char driver_version[NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE];
       NVML_CHECK(nvmlSystemGetDriverVersion(driver_version, NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE));
 
@@ -92,14 +92,14 @@ std::vector<prometheus::MetricFamily> GpuMetricsCollector::Collect() const {
       bool         fanSupported = (fanRes == NVML_SUCCESS);
 
       // CUDA memory info for this process and device
-      size_t freeMem = 0, totalMem = 0;
+      size_t freeMem        = 0, totalMem = 0;
       int    cuda_device_id = CudaUtils::GetDeviceIdFromUUID(boost_gpu_uuid);
       CudaUtils::SetDevice(cuda_device_id);
       CudaUtils::GetMemoryInfo(&freeMem, &totalMem);
 
       // GPU info
       std::vector<ClientMetric::Label> info_labels{{"uuid", cuda_gpu_device->gpu_uuid()->str()}, {"name", name}, {"driver_version", driver_version}};
-      ClientMetric          cm_info;
+      ClientMetric                     cm_info;
       cm_info.label       = info_labels;
       cm_info.gauge.value = 1;
       gpuInfoFamily.metric.push_back(cm_info);
