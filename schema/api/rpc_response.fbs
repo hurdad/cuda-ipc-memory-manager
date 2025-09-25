@@ -13,7 +13,7 @@ namespace fbs.cuda.ipc.api;
 // Response for buffer creation
 // ---------------------------------------------------------------------------
 table CreateCUDABufferResponse {
-  gpu_uuid: UUID;                    // GPU device UUID where the buffer resides
+  cuda_device_id: int;               // CUDA device id where the buffer resides
   buffer_id: UUID (required);        // Unique identifier for the created CUDA buffer
   ipc_handle: CudaIPCHandle (required); // IPC handle to share the buffer across processes
   size: uint64;                      // Size of the buffer in bytes
@@ -24,8 +24,8 @@ table CreateCUDABufferResponse {
 // Response for buffer retrieval
 // ---------------------------------------------------------------------------
 table GetCUDABufferResponse {
-  gpu_uuid: UUID;                    // GPU device UUID where the buffer resides
-  ipc_handle: CudaIPCHandle;         // IPC handle to access the requested buffer
+  cuda_device_id: int;               // CUDA device id where the buffer resides
+  ipc_handle: CudaIPCHandle (required);         // IPC handle to access the requested buffer
   size: uint64;                      // Size of the buffer in bytes
   access_id: uint32;                 // Access ID for the buffer
 }

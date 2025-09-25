@@ -1,11 +1,11 @@
 #ifndef GPUBUFFERMULTIINDEX_H
 #define GPUBUFFERMULTIINDEX_H
 
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/member.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <chrono>
 #include <vector>
@@ -15,31 +15,35 @@
 /*
  * GPUBufferRecord
  * Represents a GPU buffer and metadata.
- * Optimized layout for 64-bit alignment.
+ * Optimized for 64-bit alignment and minimal padding.
  */
 struct GPUBufferRecord {
-  boost::uuids::uuid                    buffer_id; // 16 bytes
-  void*                                 d_ptr = nullptr; // 8 bytes
-  size_t                                size  = 0; // 8 bytes
-  std::chrono::steady_clock::time_point creation_timestamp;
-  std::chrono::steady_clock::time_point last_activity_timestamp;
-  std::chrono::steady_clock::time_point expiration_timestamp; // precomputed
-  fbs::cuda::ipc::api::CudaIPCHandle    ipc_handle;
-  int32_t                               gpu_device_index = 0;
-  fbs::cuda::ipc::api::ExpirationOption expiration_option;
-  int32_t                               access_count = 0;
-  std::vector<uint32_t>                 access_ids;
+  boost::uuids::uuid buffer_id; // Unique buffer identifier (16 bytes)
+  boost::uuids::uuid gpu_uuid;  // Associated GPU UUID (16 bytes)
+
+  void*  d_ptr = nullptr; // Device pointer (8 bytes)
+  size_t size  = 0;       // Size of buffer (8 bytes)
+
+  fbs::cuda::ipc::api::CudaIPCHandle ipc_handle; // IPC handle for CUDA sharing (64 bytes)
+
+  std::chrono::steady_clock::time_point creation_timestamp;      // When buffer was created (8/16 bytes)
+  std::chrono::steady_clock::time_point last_activity_timestamp; // Last time buffer was accessed (8/16 bytes)
+  std::chrono::steady_clock::time_point expiration_timestamp;    // Precomputed expiration time (8/16 bytes)
+
+  fbs::cuda::ipc::api::ExpirationOption expiration_option; // Expiration policy, FlatBuffers struct (16 bytes)
+
+  int32_t cuda_gpu_device_index = 0; // CUDA device index (4 bytes)
+  int32_t access_count          = 0; // Number of times buffer has been accessed (4 bytes)
+
+  std::vector<uint32_t> access_ids; // IDs of entities that currently accessing this buffer
 };
 
 // Tags for Boost.MultiIndex
-struct ByBufferId {
-};
+struct ByBufferId {};
 
-struct ByExpiration {
-};
+struct ByExpiration {};
 
-struct ByAccessOptionAndCount {
-}; // Composite key: expiration_option.access_count + access_count
+struct ByAccessOptionAndCount {}; // Composite key: expiration_option.access_count + access_count
 
 using namespace boost::multi_index;
 
@@ -54,10 +58,7 @@ struct ExpAccessKey {
   using key_type    = result_type;
 
   result_type operator()(const GPUBufferRecord& r) const {
-    return std::make_pair(
-        r.expiration_option.access_count(),
-        static_cast<uint64_t>(r.access_count)
-        );
+    return std::make_pair(r.expiration_option.access_count(), static_cast<uint64_t>(r.access_count));
   }
 };
 
@@ -69,26 +70,15 @@ struct ExpAccessKey {
  * - Composite ordering by allowed access count and current access count
  */
 using GPUBufferMultiIndex = multi_index_container<
-  GPUBufferRecord,
-  indexed_by<
-    // Unique index by buffer_id
-    hashed_unique<
-      tag<ByBufferId>,
-      member<GPUBufferRecord, boost::uuids::uuid, &GPUBufferRecord::buffer_id>
-    >,
+    GPUBufferRecord, indexed_by<
+                         // Unique index by buffer_id
+                         hashed_unique<tag<ByBufferId>, member<GPUBufferRecord, boost::uuids::uuid, &GPUBufferRecord::buffer_id> >,
 
-    // Ordered index by expiration_timestamp
-    ordered_non_unique<
-      tag<ByExpiration>,
-      member<GPUBufferRecord, std::chrono::steady_clock::time_point, &GPUBufferRecord::expiration_timestamp>
-    >,
+                         // Ordered index by expiration_timestamp
+                         ordered_non_unique<tag<ByExpiration>,
+                                            member<GPUBufferRecord, std::chrono::steady_clock::time_point, &GPUBufferRecord::expiration_timestamp> >,
 
-    // Composite index: expiration_option.access_count() + access_count
-    ordered_non_unique<
-      tag<ByAccessOptionAndCount>,
-      ExpAccessKey
-    >
-  >
->;
+                         // Composite index: expiration_option.access_count() + access_count
+                         ordered_non_unique<tag<ByAccessOptionAndCount>, ExpAccessKey> > >;
 
 #endif // GPUBUFFERMULTIINDEX_H

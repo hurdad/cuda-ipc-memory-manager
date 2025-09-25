@@ -4,13 +4,14 @@
 // -------------------------------
 // External Libraries
 // -------------------------------
-#include <zmq.hpp>                // ZeroMQ (cpp-zmq) for inter-process communication
-#include <spdlog/spdlog.h>         // spdlog core logging library
-#include <spdlog/cfg/env.h>        // for spdlog::cfg::load_env_levels()
-#include <boost/uuid/uuid.hpp>     // Boost UUID class for unique buffer identification
-#include <boost/uuid/uuid_io.hpp>  // to_string support for UUIDs
+#include <spdlog/cfg/env.h> // for spdlog::cfg::load_env_levels()
+#include <spdlog/spdlog.h>  // spdlog core logging library
 
-#include "CudaUtils.h"             // Custom CUDA utility functions (user-defined)
+#include <boost/uuid/uuid.hpp>    // Boost UUID class for unique buffer identification
+#include <boost/uuid/uuid_io.hpp> // to_string support for UUIDs
+#include <zmq.hpp>                // ZeroMQ (cpp-zmq) for inter-process communication
+
+#include "CudaUtils.h" // Custom CUDA utility functions (user-defined)
 
 namespace cuda::ipc::api {
 // ============================================================
@@ -20,37 +21,39 @@ namespace cuda::ipc::api {
 // managed via CUDA IPC.
 // ============================================================
 struct GPUBuffer {
-private:
-  void*              d_ptr; // Raw pointer to allocated GPU memory (device pointer)
-  size_t             size; // Total size of the GPU buffer in bytes
-  boost::uuids::uuid buffer_id; // Unique identifier for this buffer
-  uint32_t           access_id; // Access count or handle identifier
-  int                gpu_device_index; // CUDA device index where this buffer resides
+ private:
+  void*              d_ptr;                 // Raw pointer to allocated GPU memory (device pointer)
+  size_t             size;                  // Total size of the GPU buffer in bytes
+  boost::uuids::uuid buffer_id;             // Unique identifier for this buffer
+  uint32_t           access_id;             // Access count or handle identifier
+  int                cuda_device_id;        // CUDA device id/index where this buffer resides
 
-public:
+ public:
   // ------------------------------------------------------------
   // Constructor
   // ------------------------------------------------------------
-  GPUBuffer(void*                     ptr,
-            size_t                    sz,
-            const boost::uuids::uuid& id,
-            uint32_t                  access,
-            int                       device_index)
-    : d_ptr(ptr),
-      size(sz),
-      buffer_id(id),
-      access_id(access),
-      gpu_device_index(device_index) {
+  GPUBuffer(void* ptr, size_t sz, const boost::uuids::uuid& id, uint32_t access, int device_id)
+      : d_ptr(ptr), size(sz), buffer_id(id), access_id(access), cuda_device_id(device_id) {
   }
 
   // ------------------------------------------------------------
   // Getters
   // ------------------------------------------------------------
-  void*                     getDataPtr() const { return d_ptr; }
-  size_t                    getSize() const { return size; }
-  const boost::uuids::uuid& getBufferId() const { return buffer_id; }
-  uint32_t                  getAccessId() const { return access_id; }
-  int                       getGpuDeviceIndex() const { return gpu_device_index; }
+  void* getDataPtr() const {
+    return d_ptr;
+  }
+  size_t getSize() const {
+    return size;
+  }
+  const boost::uuids::uuid& getBufferId() const {
+    return buffer_id;
+  }
+  uint32_t getAccessId() const {
+    return access_id;
+  }
+  int getCudaDeviceId() const {
+    return cuda_device_id;
+  }
 };
 
 // ============================================================
@@ -60,7 +63,7 @@ public:
 // and communication between different processes via ZeroMQ.
 // ============================================================
 class CudaIpcMemoryManagerAPI {
-public:
+ public:
   // ------------------------------------------------------------
   // Constructor / Destructor
   // ------------------------------------------------------------
@@ -75,17 +78,14 @@ public:
    * @brief Request creation of a new CUDA buffer.
    *
    * @param size                     Size of the buffer to allocate (in bytes)
-   * @param gpu_device_index          Index of the target CUDA device (default: 0)
+   * @param gpu_uuid                  UUID of the target GPU device (default: 0)
    * @param expiration_access_count   Access count limit before the buffer expires (default: 0, disabled)
    * @param expiration_ttl            Time-to-live before the buffer expires (default: 0, infinite)
    * @param zero_buffer               If true, zero-initialize the buffer (default: false)
    * @return GPUBuffer                Struct containing buffer metadata
    */
-  GPUBuffer CreateCUDABufferRequest(uint64_t size,
-                                    int32_t  gpu_device_index        = 0,
-                                    int32_t  expiration_access_count = 0,
-                                    size_t   expiration_ttl          = 0,
-                                    bool     zero_buffer             = false);
+  GPUBuffer CreateCUDABufferRequest(uint64_t size, boost::uuids::uuid gpu_uuid, int32_t expiration_access_count = 0, size_t expiration_ttl = 0,
+                                    bool zero_buffer = false);
 
   /**
    * @brief Retrieve an existing CUDA buffer by its unique ID.
@@ -109,12 +109,12 @@ public:
    */
   void FreeCUDABufferRequest(const boost::uuids::uuid buffer_id);
 
-private:
+ private:
   // ------------------------------------------------------------
   // Internal Members
   // ------------------------------------------------------------
   zmq::context_t context_; // ZeroMQ context for managing sockets
-  zmq::socket_t  socket_; // ZeroMQ socket for sending/receiving IPC messages
+  zmq::socket_t  socket_;  // ZeroMQ socket for sending/receiving IPC messages
 };
 } // namespace cuda::ipc::api
 

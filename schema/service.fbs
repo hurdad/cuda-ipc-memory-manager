@@ -39,7 +39,7 @@ union MemoryMaxAllocation {
 // ============================================================================
 
 // Configuration for a single CUDA GPU device.
-table GPUDevice {
+table CUDAGPUDevice {
   gpu_uuid: string (key, required);                       // Nvidia GPU UUID
   max_memory_allocation: MemoryMaxAllocation (required);  // Memory allocation policy for this device
 }
@@ -50,7 +50,7 @@ table GPUDevice {
 
 // Root configuration for the CUDA IPC Memory Manager Service.
 table Configuration {
-  cuda_gpu_devices: [GPUDevice];           // List of CUDA GPU devices to manage
+  cuda_gpu_devices: [CUDAGPUDevice];           // List of CUDA GPU devices to manage
   zmq_request_endpoint: string (required); // ZeroMQ endpoint for IPC requests
   prometheus_endpoint: string (required);  // HTTP endpoint for Prometheus metrics
   expiration_thread_interval_ms: uint = 1000; // Interval in milliseconds for the cleanup thread (default: 1000 ms)

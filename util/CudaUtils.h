@@ -1,6 +1,9 @@
 #ifndef CUDA_UTILS_H
 #define CUDA_UTILS_H
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 #include "api/common_generated.h" // for fbs::cuda::ipc::api::CudaIPCHandle
 
 /**
@@ -100,6 +103,14 @@ public:
   static void GetMemoryInfo(size_t* free, size_t* total);
 
   static void GetTotalMemoryInfo(size_t* free, size_t* total);
+
+  /**
+ * Get the CUDA device ID from a GPU UUID string.
+ * @param uuid_str GPU UUID string in the format "GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+ * @return CUDA device ID
+ * @throws std::runtime_error if no device with the given UUID is found.
+ */
+  static int GetDeviceIdFromUUID(const boost::uuids::uuid& gpu_uuid);
 };
 
 #endif // CUDA_UTILS_H

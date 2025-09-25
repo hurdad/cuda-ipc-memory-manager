@@ -1,6 +1,9 @@
-#include <iostream>
-#include <boost/uuid/uuid_io.hpp>
 #include <cuda_runtime.h>
+
+#include <boost/uuid/string_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <iostream>
+
 #include "CudaIpcMemoryManagerAPI.h"
 
 // CUDA kernel: increment each element of an array by 1
@@ -12,49 +15,44 @@ __global__ void incrementKernel(float* d, int n) {
 }
 
 int main(int argc, char** argv) {
-  try {
-    // Create an instance of the IPC memory manager API
-    cuda::ipc::api::CudaIpcMemoryManagerAPI api(
-        "ipc:///tmp/cuda-ipc-memory-manager-service.ipc"
-        );
+  // try {
+  //  Create an instance of the IPC memory manager API
+  cuda::ipc::api::CudaIpcMemoryManagerAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
 
-    // Parameters for GPU buffer request
-    int  N                   = 268435456; // Number of floats
-    int  gpu_device_index    = 0; // GPU device index
-    int  expire_access_count = 0; // Access count before expiration (0=disable)
-    int  expire_ttl          = 10; // Time-to-live in seconds before expiration (0=disable)
-    bool zero_buffer         = true; // Initialize buffer to zero
+  std::string gpu_uuid = "ab29f361-2479-f8c8-f2e2-a56c3692a3ac";
 
-    // Request GPU buffer
-    auto gpu_buffer = api.CreateCUDABufferRequest(
-        N * sizeof(float),
-        gpu_device_index,
-        expire_access_count,
-        expire_ttl,
-        zero_buffer
-        );
+  // Parameters for GPU buffer request
+  int                            N = 268435456; // Number of floats
+  boost::uuids::string_generator gen;
+  boost::uuids::uuid             boost_gpu_uuid      = gen(gpu_uuid); // GPU UUID
+  int                            expire_access_count = 0;             // Access count before expiration (0=disable)
+  int                            expire_ttl          = 120;            // Time-to-live in seconds before expiration (0=disable)
+  bool                           zero_buffer         = true;          // Initialize buffer to zero
 
-    // Get buffer ID (UUID) and print it
-    auto        buffer_id = gpu_buffer.getBufferId();
-    std::string uuid_str  = boost::uuids::to_string(buffer_id);
-    std::cout << "Buffer ID: " << uuid_str << std::endl;
+  // Request GPU buffer
+  auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float), boost_gpu_uuid, expire_access_count, expire_ttl, zero_buffer);
 
-    // Access the device pointer as a float array
-    float* d_ptr = static_cast<float*>(gpu_buffer.getDataPtr());
+  // Get buffer ID (UUID) and print it
+  auto        buffer_id = gpu_buffer.getBufferId();
+  std::string uuid_str  = boost::uuids::to_string(buffer_id);
+  std::cout << "Buffer ID: " << uuid_str << std::endl;
 
-    // Launch CUDA kernel to increment each element
-    int threadsPerBlock = 256;
-    int blocks          = (N + threadsPerBlock - 1) / threadsPerBlock;
-    incrementKernel<<<blocks, threadsPerBlock>>>(d_ptr, N);
+  // Access the device pointer as a float array
+  float* d_ptr = static_cast<float*>(gpu_buffer.getDataPtr());
 
-    // Wait for GPU to finish execution
-    cudaDeviceSynchronize();
+  // Launch CUDA kernel to increment each element
+  int threadsPerBlock = 256;
+  int blocks          = (N + threadsPerBlock - 1) / threadsPerBlock;
+  incrementKernel<<<blocks, threadsPerBlock>>>(d_ptr, N);
 
-    // Notify the IPC manager that we are done with the buffer
-    api.NotifyDoneRequest(gpu_buffer);
-  } catch (const std::exception& e) {
-    std::cerr << "Exception: " << e.what() << std::endl;
-  }
+  // Wait for GPU to finish execution
+  cudaDeviceSynchronize();
+
+  // Notify the IPC manager that we are done with the buffer
+  api.NotifyDoneRequest(gpu_buffer);
+  // } catch (const std::exception& e) {
+  //   std::cerr << "Exception: " << e.what() << std::endl;
+  // }
 
   std::cout << "Exiting..." << std::endl;
   return 0;
