@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     boost::uuids::string_generator gen;
 
     // Parse the string into a boost::uuids::uuid
-    boost::uuids::uuid buffer_id = gen("ab6910de-03c6-43e3-8faf-ba42651b5207");
+    boost::uuids::uuid buffer_id = gen("8600be21-f3f2-4715-ac73-938fa21d3c62");
 
     // Free the GPU buffer associated with the given UUID
     api.FreeCUDABufferRequest(buffer_id);

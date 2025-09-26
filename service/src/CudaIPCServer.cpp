@@ -107,7 +107,7 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
                               .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   expire_buffers_latency_ = &prometheus::BuildHistogram()
-                                 .Name("c")
+                                 .Name("cuda_ipc_expire_buffers_latency_seconds")
                                  .Help("Latency of cleanupExpiredBuffers function requests in seconds")
                                  .Register(*registry_)
                                  .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});

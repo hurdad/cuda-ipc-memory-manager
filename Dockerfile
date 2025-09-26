@@ -49,3 +49,4 @@ WORKDIR /app
 # Copy built binary and configs
 COPY --from=build /app/build/service/cuda-ipc-memory-manager-service /app/cuda-ipc-memory-manager-service
 COPY --from=build /app/service/config/ /app/config/
+COPY --from=build /app/build/examples/create-buffer-example /app/examples

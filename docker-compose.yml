@@ -5,7 +5,7 @@ services:
     runtime: nvidia
     network_mode: host
     restart: unless-stopped
-    #user: "1000:1000"
+    ipc: host
     environment:
       - SPDLOG_LEVEL=TRACE
       - GPU_INDEX_DEVICE=0
