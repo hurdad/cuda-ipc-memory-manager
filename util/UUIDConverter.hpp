@@ -22,7 +22,7 @@ public:
     uint64_t uuid_h, uuid_l;
     std::memcpy(&uuid_h, boostUuid.data, sizeof(uint64_t));
     std::memcpy(&uuid_l, boostUuid.data + sizeof(uint64_t), sizeof(uint64_t));
-    return fbs::cuda::ipc::api::UUID(uuid_l, uuid_h);
+    return fbs::cuda::ipc::api::UUID(uuid_h, uuid_l);
   }
 
   /**

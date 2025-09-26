@@ -26,8 +26,8 @@ int main(int argc, char** argv) {
   boost::uuids::string_generator gen;
   boost::uuids::uuid             boost_gpu_uuid      = gen(gpu_uuid); // GPU UUID
   int                            expire_access_count = 0;             // Access count before expiration (0=disable)
-  int                            expire_ttl          = 120;            // Time-to-live in seconds before expiration (0=disable)
-  bool                           zero_buffer         = true;          // Initialize buffer to zero
+  int                            expire_ttl          = 0;            // Time-to-live in seconds before expiration (0=disable)
+  bool                           zero_buffer         = false;          // Initialize buffer to zero
 
   // Request GPU buffer
   auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float), boost_gpu_uuid, expire_access_count, expire_ttl, zero_buffer);

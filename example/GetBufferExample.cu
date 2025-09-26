@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
         boost::uuids::string_generator gen;
 
         // Parse the string into a boost::uuids::uuid
-        boost::uuids::uuid buffer_id = gen("9421bfce-e78f-65ca-42e8-226f77c54a76");
+        boost::uuids::uuid buffer_id = gen("ab6910de-03c6-43e3-8faf-ba42651b5207");
 
         // Retrieve GPU buffer using the UUID
         auto gpu_buffer = api.GetCUDABufferRequest(buffer_id);
