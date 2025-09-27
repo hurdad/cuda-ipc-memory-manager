@@ -20,7 +20,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
   flatbuffers::FlatBufferBuilder        builder;
   fbs::cuda::ipc::api::ExpirationOption expiration_option(expiration_access_count, expiration_ttl);
   auto                                  fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
-  auto req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, size, &fbs_gpu_uuid, &expiration_option, zero_buffer);
+  auto req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, &fbs_gpu_uuid, size, &expiration_option, zero_buffer);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
 
