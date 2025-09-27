@@ -2,19 +2,27 @@ services:
 
   cuda-ipc-memory-manager-service:
     build: .
-    runtime: nvidia
     network_mode: host
     restart: unless-stopped
     ipc: host
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
     environment:
       - SPDLOG_LEVEL=TRACE
-      - GPU_INDEX_DEVICE=0
+      - GPU_UUID_0=ab29f361-2479-f8c8-f2e2-a56c3692a3ac
+      - GPU_UUID_1=b9d111bf-dcea-67b5-acba-63b8c6efa84c
       - ZMQ_ROUTER_ENDPOINT=ipc:///tmp/cuda-ipc-memory-manager-service.ipc
       - PROMETHEUS_ENDPOINT=0.0.0.0:9242
     volumes:
       - /tmp:/tmp
     privileged: true
-    command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/config.tpl" ]
+    command: [ "/app/cuda-ipc-memory-manager-service", "--config", "/app/config/two.gpu.tpl" ]
 
   prometheus:
     image: prom/prometheus:latest
