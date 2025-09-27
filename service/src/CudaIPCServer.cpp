@@ -119,6 +119,10 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
   gpu_metrics_collector_ = std::make_shared<GpuMetricsCollector>(configuration_);
   exposer_->RegisterCollectable(gpu_metrics_collector_);
 
+  // Register Process Metrics Collector directly with the exposer
+  process_metrics_collector_ = std::make_shared<ProcessMetricsCollector>();
+  exposer_->RegisterCollectable(process_metrics_collector_);
+
   // bind zmq req socket
   socket_.bind(configuration->zmq_request_endpoint()->str());
 

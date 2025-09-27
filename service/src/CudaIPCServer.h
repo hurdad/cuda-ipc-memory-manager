@@ -35,11 +35,14 @@
 // GPU Metrics
 #include "GpuMetricsCollector.h"
 
+// Process Metrics
+#include "ProcessMetricsCollector.hpp"
+
 // Gpu Buffer Multi Index
 #include "GPUBufferMultiIndex.h"
 
 class CudaIPCServer {
- public:
+public:
   CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration);
   ~CudaIPCServer();
 
@@ -47,17 +50,17 @@ class CudaIPCServer {
   void stop();
   void join();
 
- private:
+private:
   const fbs::cuda::ipc::service::Configuration* configuration_;
   zmq::context_t                                context_;
   zmq::socket_t                                 socket_;
   std::thread                                   server_thread_;
   std::thread                                   expiration_thread_;
-  std::atomic<bool>                             running_;       // stop flag
-  GPUBufferMultiIndex                           buffers_;       // container that holds GPUBufferRecord
+  std::atomic<bool>                             running_; // stop flag
+  GPUBufferMultiIndex                           buffers_; // container that holds GPUBufferRecord
   std::mutex                                    buffers_mutex_; // <-- Protects access to buffers_
   std::unordered_map<boost::uuids::uuid, size_t, boost::hash<boost::uuids::uuid>>
-      max_gpu_allocated_memory_; // max gpu allocated memory mapped by gpu_device_index
+  max_gpu_allocated_memory_; // max gpu allocated memory mapped by gpu_device_index
   std::unordered_map<boost::uuids::uuid, int, boost::hash<boost::uuids::uuid>> gpu_uuid_to_cuda_device_index_;
 
   // Main server loop
@@ -68,32 +71,33 @@ class CudaIPCServer {
 
   // Functions for handling individual request types
   void handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
-                          std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+                          std::chrono::time_point<std::chrono::steady_clock>  start_timestamp);
+  void handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req, flatbuffers::FlatBufferBuilder& response_builder,
                        std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req, flatbuffers::FlatBufferBuilder& response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
-  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+  void handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req, flatbuffers::FlatBufferBuilder& response_builder,
                         std::chrono::time_point<std::chrono::steady_clock> start_timestamp);
 
   static boost::uuids::uuid generateUUID();
   static bool               setThreadRealtime(std::thread& t);
 
   // Prometheus metrics
-  std::shared_ptr<prometheus::Registry>                                                         registry_;
-  std::unique_ptr<prometheus::Exposer>                                                          exposer_;
-  prometheus::Counter*                                                                          requests_total_;
-  prometheus::Counter*                                                                          errors_total_;
-  std::unordered_map<boost::uuids::uuid, prometheus::Gauge*, boost::hash<boost::uuids::uuid>>   allocated_buffers_map_;     // key gpu_uuid
-  std::unordered_map<boost::uuids::uuid, prometheus::Gauge*, boost::hash<boost::uuids::uuid>>   allocated_bytes_map_;       // key gpu_uuid
-  prometheus::Counter*                                                                          expired_buffers_;
-  prometheus::Histogram*                                                                        create_buffer_latency_;
-  prometheus::Histogram*                                                                        get_buffer_latency_;
-  prometheus::Histogram*                                                                        notify_done_latency_;
-  prometheus::Histogram*                                                                        free_buffer_latency_;
-  prometheus::Histogram*                                                                        expire_buffers_latency_;
+  std::shared_ptr<prometheus::Registry>                                                       registry_;
+  std::unique_ptr<prometheus::Exposer>                                                        exposer_;
+  prometheus::Counter*                                                                        requests_total_;
+  prometheus::Counter*                                                                        errors_total_;
+  std::unordered_map<boost::uuids::uuid, prometheus::Gauge*, boost::hash<boost::uuids::uuid>> allocated_buffers_map_; // key gpu_uuid
+  std::unordered_map<boost::uuids::uuid, prometheus::Gauge*, boost::hash<boost::uuids::uuid>> allocated_bytes_map_; // key gpu_uuid
+  prometheus::Counter*                                                                        expired_buffers_;
+  prometheus::Histogram*                                                                      create_buffer_latency_;
+  prometheus::Histogram*                                                                      get_buffer_latency_;
+  prometheus::Histogram*                                                                      notify_done_latency_;
+  prometheus::Histogram*                                                                      free_buffer_latency_;
+  prometheus::Histogram*                                                                      expire_buffers_latency_;
 
-  std::shared_ptr<GpuMetricsCollector> gpu_metrics_collector_;
+  std::shared_ptr<GpuMetricsCollector>     gpu_metrics_collector_;
+  std::shared_ptr<ProcessMetricsCollector> process_metrics_collector_;
 };
 
 #endif // CUDA_UTILS_H
