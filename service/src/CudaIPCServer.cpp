@@ -1,7 +1,7 @@
 #include "CudaIPCServer.h"
 
 CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* configuration)
-    : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
+  : configuration_(configuration), context_(1), socket_(context_, zmq::socket_type::rep), running_(false) {
   // create a metrics registry
   registry_ = std::make_shared<prometheus::Registry>();
 
@@ -46,15 +46,15 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
       // init metrics per gpu
       allocated_buffers_map_[boost_gpu_uuid] = &prometheus::BuildGauge()
-                                                    .Name("cuda_ipc_allocated_buffers")
-                                                    .Help("Current number of buffers allocated by GPU")
-                                                    .Register(*registry_)
-                                                    .Add({{"uuid", cuda_gpu_device->gpu_uuid()->str()}});
+                                                .Name("cuda_ipc_allocated_buffers")
+                                                .Help("Current number of buffers allocated by GPU")
+                                                .Register(*registry_)
+                                                .Add({{"uuid", cuda_gpu_device->gpu_uuid()->str()}});
       allocated_bytes_map_[boost_gpu_uuid] = &prometheus::BuildGauge()
-                                                  .Name("cuda_ipc_allocated_bytes")
-                                                  .Help("Current number of bytes allocated by GPU")
-                                                  .Register(*registry_)
-                                                  .Add({{"uuid", cuda_gpu_device->gpu_uuid()->str()}});
+                                              .Name("cuda_ipc_allocated_bytes")
+                                              .Help("Current number of bytes allocated by GPU")
+                                              .Register(*registry_)
+                                              .Add({{"uuid", cuda_gpu_device->gpu_uuid()->str()}});
     }
   }
 
@@ -73,44 +73,44 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 
   // Histogram buckets (in seconds)
   std::vector<double> latency_buckets{
-      1e-6,   // 1 μs
-      10e-6,  // 10 μs
+      1e-6, // 1 μs
+      10e-6, // 10 μs
       100e-6, // 100 μs
-      1e-3,   // 1 ms
-      10e-3,  // 10 ms
-      0.1,    // 100 ms
-      1.0     // 1 s
+      1e-3, // 1 ms
+      10e-3, // 10 ms
+      0.1, // 100 ms
+      1.0 // 1 s
   };
 
   create_buffer_latency_ = &prometheus::BuildHistogram()
-                                .Name("cuda_ipc_api_create_buffer_latency_seconds")
-                                .Help("Latency of CreateCUDABuffer requests in seconds")
-                                .Register(*registry_)
-                                .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                            .Name("cuda_ipc_api_create_buffer_latency_seconds")
+                            .Help("Latency of CreateCUDABuffer requests in seconds")
+                            .Register(*registry_)
+                            .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   get_buffer_latency_ = &prometheus::BuildHistogram()
-                             .Name("cuda_ipc_api_get_buffer_latency_seconds")
-                             .Help("Latency of GetCUDABuffer requests in seconds")
-                             .Register(*registry_)
-                             .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                         .Name("cuda_ipc_api_get_buffer_latency_seconds")
+                         .Help("Latency of GetCUDABuffer requests in seconds")
+                         .Register(*registry_)
+                         .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   notify_done_latency_ = &prometheus::BuildHistogram()
-                              .Name("cuda_ipc_api_notify_done_latency_seconds")
-                              .Help("Latency of NotifyDone requests in seconds")
-                              .Register(*registry_)
-                              .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                          .Name("cuda_ipc_api_notify_done_latency_seconds")
+                          .Help("Latency of NotifyDone requests in seconds")
+                          .Register(*registry_)
+                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   free_buffer_latency_ = &prometheus::BuildHistogram()
-                              .Name("cuda_ipc_api_free_buffer_latency_seconds")
-                              .Help("Latency of FreeCUDABuffer requests in seconds")
-                              .Register(*registry_)
-                              .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                          .Name("cuda_ipc_api_free_buffer_latency_seconds")
+                          .Help("Latency of FreeCUDABuffer requests in seconds")
+                          .Register(*registry_)
+                          .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   expire_buffers_latency_ = &prometheus::BuildHistogram()
-                                 .Name("cuda_ipc_expire_buffers_latency_seconds")
-                                 .Help("Latency of cleanupExpiredBuffers function requests in seconds")
-                                 .Register(*registry_)
-                                 .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
+                             .Name("cuda_ipc_expire_buffers_latency_seconds")
+                             .Help("Latency of cleanupExpiredBuffers function requests in seconds")
+                             .Register(*registry_)
+                             .Add({}, prometheus::Histogram::BucketBoundaries{latency_buckets});
 
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
@@ -251,7 +251,7 @@ void CudaIPCServer::run() {
 }
 
 void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
-                                       std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
+                                       std::chrono::time_point<std::chrono::steady_clock>  start_timestamp) {
   // convert requeste gpu uuid to boost uuid
   auto gpu_uuid       = req->gpu_uuid();
   auto boost_gpu_uuid = util::UUIDConverter::toBoostUUID(*gpu_uuid);
@@ -343,7 +343,7 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // finish up response message
   auto resp_offset = resp.Finish();
-  auto msg =
+  auto msg         =
       fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_CreateCUDABufferResponse, resp_offset.o);
   response_builder.Finish(msg);
 
@@ -352,7 +352,7 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
   create_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequest*   req, flatbuffers::FlatBufferBuilder& response_builder,
                                     std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -376,14 +376,14 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
 
     // update buffer entry - add new access_id and update last activity timestamp
     id_index.modify(it, [access_id](GPUBufferRecord& record) {
-      record.access_ids.push_back(access_id);                            // save access id
+      record.access_ids.push_back(access_id); // save access id
       record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
     });
 
     // init flatbuffers success response
     auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(response_builder, gpu_buffer_entry.cuda_gpu_device_index,
                                                                  &gpu_buffer_entry.ipc_handle, gpu_buffer_entry.size, access_id);
-    auto msg  = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
+    auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
     response_builder.Finish(msg);
   } // lock released here
 
@@ -392,7 +392,7 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
   get_buffer_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneRequest*      req, flatbuffers::FlatBufferBuilder& response_builder,
                                      std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -419,7 +419,7 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
 
     // update buffer entry - add new access_id and update last activity timestamp
     id_index.modify(it, [access_id](GPUBufferRecord& record) {
-      record.access_ids.erase(access_id);                                // delete access_id from list
+      record.access_ids.erase(access_id); // delete access_id from list
       record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
       // decrement access count if enabled
@@ -437,7 +437,7 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
   notify_done_latency_->Observe(elapsed.count());
 }
 
-void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest* req, flatbuffers::FlatBufferBuilder& response_builder,
+void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRequest*  req, flatbuffers::FlatBufferBuilder& response_builder,
                                      std::chrono::time_point<std::chrono::steady_clock> start_timestamp) {
   // convert flatbuffers uuid to boost uuid
   auto buffer_id = util::UUIDConverter::toBoostUUID(*req->buffer_id());
@@ -455,6 +455,11 @@ void CudaIPCServer::handleFreeBuffer(const fbs::cuda::ipc::api::FreeCUDABufferRe
 
     // get buffer entry
     GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
+
+    // check if anyone is still accessing buffer
+    if (gpu_buffer_entry.access_ids.size() > 0) {
+      throw std::runtime_error(fmt::format("Buffer ID still being accessed = {}", boost::uuids::to_string(buffer_id)));
+    }
 
     // set device before free
     CudaUtils::SetDevice(gpu_buffer_entry.cuda_gpu_device_index);
