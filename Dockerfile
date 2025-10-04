@@ -7,8 +7,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
-    flatbuffers-compiler \
-    libflatbuffers-dev \
     libboost-program-options1.83-dev \
     libspdlog-dev \
     cppzmq-dev \
@@ -36,7 +34,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install runtime dependencies
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     libspdlog1.12 \
-    libflatbuffers2 \
     libboost-program-options1.83.0 \
     libzmq5 \
     libnvidia-ml-dev \

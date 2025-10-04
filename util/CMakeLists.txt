@@ -9,3 +9,8 @@ add_library(cuda-util STATIC
 target_link_libraries(cuda-util PUBLIC cuda-ipc-flatbuffers-generated)
 
 target_include_directories(cuda-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_include_directories(cuda-util
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/schema/external/flatbuffers/include
+)

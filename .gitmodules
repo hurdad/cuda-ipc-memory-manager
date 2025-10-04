@@ -1,3 +1,6 @@
 [submodule "external/prometheus-cpp"]
 	path = service/external/prometheus-cpp
 	url = https://github.com/jupp0r/prometheus-cpp.git
+[submodule "schema/external/flatbuffers"]
+	path = schema/external/flatbuffers
+	url = https://github.com/google/flatbuffers.git

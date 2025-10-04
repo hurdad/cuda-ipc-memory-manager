@@ -1,12 +1,13 @@
 # --- FlatBuffers codegen setup ---
 
+# Add FlatBuffers from submodule
+set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE) # Disable tests
+add_subdirectory(external/flatbuffers)
+
 # Directories
-set(FBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(FBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fbs")
 set(GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${GEN_DIR}")
-
-# Make sure we have the flatbuffers compiler `flatc`
-find_program(FLATC_EXECUTABLE flatc REQUIRED)
 
 # Recursively find all .fbs files in the current directory
 file(GLOB_RECURSE FBS_SRCS "${FBS_DIR}/*.fbs")
@@ -40,13 +41,13 @@ foreach (fbs_file ${FBS_SRCS})
     # Rule to generate it
     add_custom_command(
             OUTPUT "${gen_hdr}"
-            COMMAND ${FLATC_EXECUTABLE}
+            COMMAND $<TARGET_FILE:flatc>
             --cpp
             --bfbs-gen-embed
             -I "${FBS_DIR}"
             -o "${gen_dir_full}"
             "${fbs_file}"
-            DEPENDS "${fbs_file}"
+            DEPENDS "${fbs_file}" flatc
             COMMENT "Generating Flatbuffers C++ header for ${fbs_file}"
             VERBATIM
     )
