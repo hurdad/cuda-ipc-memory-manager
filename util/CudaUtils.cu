@@ -49,21 +49,21 @@ void CudaUtils::CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes
   std::cout << "[CudaUtils] Copied " << numBytes << " bytes from device to host (" << d_buffer << ")\n";
 }
 
-fbs::cuda::ipc::api::CudaIPCHandle CudaUtils::GetCudaMemoryHandle(void* d_ptr) {
+const std::array<uint8_t, 64> CudaUtils::GetCudaMemoryHandle(void* d_ptr) {
   cudaIpcMemHandle_t handle;
   // Create IPC handle for device memory; throws on failure
   CUDA_CHECK(cudaIpcGetMemHandle(&handle, d_ptr));
 
   std::cout << "[CudaUtils] Created CUDA IPC handle for device pointer " << d_ptr << "\n";
 
-  // Convert CUDA handle to Flatbuffers span
-  flatbuffers::span<const uint8_t, 64> fb_span(reinterpret_cast<const uint8_t*>(&handle), sizeof(handle));
-  return fbs::cuda::ipc::api::CudaIPCHandle(fb_span);
+  // Copy CUDA handle into std::array
+  std::array<uint8_t, 64> handle_storage;
+  std::memcpy(handle_storage.data(), &handle, sizeof(handle));
+  return handle_storage;
 }
 
-void* CudaUtils::OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle) {
+void* CudaUtils::OpenHandleToCudaMemory(const std::array<uint8_t, 64>& cuda_ipc_handle) {
   cudaIpcMemHandle_t handle;
-  static_assert(sizeof(handle) <= sizeof(cuda_ipc_handle), "Array size is too small for cudaIpcMemHandle_t");
 
   // Copy Flatbuffers data to CUDA handle
   std::memcpy(&handle, &cuda_ipc_handle, sizeof(handle));

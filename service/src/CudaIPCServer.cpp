@@ -274,7 +274,11 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // allocate device buffer and get handle
   auto d_ptr                  = CudaUtils::AllocDeviceBuffer(req->size(), req->zero_buffer());
-  auto cuda_ipc_memory_handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
+  auto cuda_ipc_memory_handle_arr = CudaUtils::GetCudaMemoryHandle(d_ptr);
+
+  // Convert CUDA handle to Flatbuffers span
+  flatbuffers::span<const uint8_t, 64> fb_span(reinterpret_cast<const uint8_t*>(cuda_ipc_memory_handle_arr.data()), 64);
+  fbs::cuda::ipc::api::CudaIPCHandle cuda_ipc_memory_handle(fb_span);
 
   // generate ids
   auto buffer_id = generateUUID();

@@ -1,10 +1,9 @@
 #ifndef CUDA_UTILS_H
 #define CUDA_UTILS_H
 
+#include <array>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
-#include "api/common_generated.h" // for fbs::cuda::ipc::api::CudaIPCHandle
 
 /**
  * Macro to wrap CUDA API calls.
@@ -77,7 +76,7 @@ public:
    * @return Flatbuffers-wrapped IPC handle.
    * @throws std::runtime_error if cudaIpcGetMemHandle fails.
    */
-  static fbs::cuda::ipc::api::CudaIPCHandle GetCudaMemoryHandle(void* d_ptr);
+  static const std::array<uint8_t, 64> GetCudaMemoryHandle(void* d_ptr);
 
   /**
    * Open a CUDA IPC handle in the current process.
@@ -85,7 +84,7 @@ public:
    * @return Pointer to device memory mapped in this process.
    * @throws std::runtime_error if cudaIpcOpenMemHandle fails.
    */
-  static void* OpenHandleToCudaMemory(const fbs::cuda::ipc::api::CudaIPCHandle& cuda_ipc_handle);
+  static void* OpenHandleToCudaMemory(const std::array<uint8_t, 64>& cuda_ipc_handle);
 
   /**
    * Close a previously opened CUDA IPC handle.
@@ -101,8 +100,6 @@ public:
    * @throws std::runtime_error if cudaMemGetInfo fails.
    */
   static void GetMemoryInfo(size_t* free, size_t* total);
-
-  static void GetTotalMemoryInfo(size_t* free, size_t* total);
 
   /**
  * Get the CUDA device ID from a GPU UUID string.

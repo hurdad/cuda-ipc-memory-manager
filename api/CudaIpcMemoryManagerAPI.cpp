@@ -89,8 +89,12 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
   // set cuda device before we get memory handle
   CudaUtils::SetDevice(device_id);
 
+  // copy fbs ipc handle to std::array
+  std::array<uint8_t, 64> ipc_handle_arr;
+  std::copy(ipc_handle->value()->begin(), ipc_handle->value()->end(), ipc_handle_arr.begin());
+
   // get device pointer from ipc_handle
-  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
+  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(ipc_handle_arr);
 
   // build return struct GPUBuffer
   return GPUBuffer(d_ptr, size, util::UUIDConverter::toBoostUUID(*buffer_id), access_id, device_id);
@@ -162,8 +166,12 @@ GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid
   // set cuda device before we get memory handle
   CudaUtils::SetDevice(cuda_device_id);
 
+  // copy fbs ipc handle to std::array
+  std::array<uint8_t, 64> ipc_handle_arr;
+  std::copy(ipc_handle->value()->begin(), ipc_handle->value()->end(), ipc_handle_arr.begin());
+
   // get device pointer from ipc_handle
-  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(*ipc_handle);
+  void* d_ptr = CudaUtils::OpenHandleToCudaMemory(ipc_handle_arr);
 
   // build return struct GPUBuffer
   return GPUBuffer(d_ptr, size, buffer_id, access_id, cuda_device_id);
