@@ -1,5 +1,9 @@
 find_package(spdlog REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
+
+set(ENABLE_TESTING OFF CACHE BOOL "" FORCE) # Disable tests
+set(ENABLE_PUSH OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(external/prometheus-cpp)
 
 add_executable(cuda-ipc-memory-manager-service
