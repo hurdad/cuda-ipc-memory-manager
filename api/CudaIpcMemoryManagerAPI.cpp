@@ -18,7 +18,7 @@ CudaIpcMemoryManagerAPI::~CudaIpcMemoryManagerAPI() {
 std::vector<boost::uuids::uuid> CudaIpcMemoryManagerAPI::GetAvailableGPUs() {
   // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto req = fbs::cuda::ipc::api::CreateGetAvailableGPUsRequest(builder);
+  auto                           req = fbs::cuda::ipc::api::CreateGetAvailableGPUsRequest(builder);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetAvailableGPUsRequest, req.o);
   builder.Finish(msg);
 
@@ -35,7 +35,7 @@ std::vector<boost::uuids::uuid> CudaIpcMemoryManagerAPI::GetAvailableGPUs() {
     throw std::runtime_error("Failed to receive response from server.");
   }
 
-  spdlog::info("Received response : {}", response_msg.size());
+  spdlog::debug("Received response : {}", response_msg.size());
 
   // get response buffer
   auto response_buf  = response_msg.data();
@@ -71,10 +71,12 @@ std::vector<boost::uuids::uuid> CudaIpcMemoryManagerAPI::GetAvailableGPUs() {
 
   // convert fbs gpu uuids to boost uuid vector
   std::vector<boost::uuids::uuid> gpu_uuids;
-  for (auto gpu_uuid : *gpus_response->gpus()) {
-    gpu_uuids.push_back(util::UUIDConverter::toBoostUUID(*gpu_uuid));
+  auto                            gpus = gpus_response->gpus();
+  if (gpus) {
+    for (auto gpu_uuid : *gpus) {
+      gpu_uuids.push_back(util::UUIDConverter::toBoostUUID(*gpu_uuid));
+    }
   }
-
   // return gpu_uuids
   return gpu_uuids;
 }
@@ -83,8 +85,8 @@ std::vector<boost::uuids::uuid> CudaIpcMemoryManagerAPI::GetAvailableGPUs() {
 uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBufferCount(const boost::uuids::uuid& gpu_uuid) {
   // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
-  auto req = fbs::cuda::ipc::api::CreateGetAllocatedTotalBufferCountRequest(builder, &fbs_gpu_uuid);
+  auto                           fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
+  auto                           req          = fbs::cuda::ipc::api::CreateGetAllocatedTotalBufferCountRequest(builder, &fbs_gpu_uuid);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetAllocatedTotalBufferCountRequest, req.o);
   builder.Finish(msg);
 
@@ -101,7 +103,7 @@ uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBufferCount(const boost::uuid
     throw std::runtime_error("Failed to receive response from server.");
   }
 
-  spdlog::info("Received response : {}", response_msg.size());
+  spdlog::debug("Received response : {}", response_msg.size());
 
   // get response buffer
   auto response_buf  = response_msg.data();
@@ -143,8 +145,8 @@ uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBufferCount(const boost::uuid
 uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBytes(const boost::uuids::uuid& gpu_uuid) {
   // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
-  auto req = fbs::cuda::ipc::api::CreateGetAllocatedTotalBytesRequest(builder, &fbs_gpu_uuid);
+  auto                           fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
+  auto                           req          = fbs::cuda::ipc::api::CreateGetAllocatedTotalBytesRequest(builder, &fbs_gpu_uuid);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetAllocatedTotalBytesRequest, req.o);
   builder.Finish(msg);
 
@@ -161,7 +163,7 @@ uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBytes(const boost::uuids::uui
     throw std::runtime_error("Failed to receive response from server.");
   }
 
-  spdlog::info("Received response : {}", response_msg.size());
+  spdlog::debug("Received response : {}", response_msg.size());
 
   // get response buffer
   auto response_buf  = response_msg.data();
@@ -203,8 +205,8 @@ uint64_t CudaIpcMemoryManagerAPI::GetAllocatedTotalBytes(const boost::uuids::uui
 uint64_t CudaIpcMemoryManagerAPI::GetMaxAllocationBytes(const boost::uuids::uuid& gpu_uuid) {
   // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
-  auto req = fbs::cuda::ipc::api::CreateGetMaxAllocationBytesRequest(builder, &fbs_gpu_uuid);
+  auto                           fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
+  auto                           req          = fbs::cuda::ipc::api::CreateGetMaxAllocationBytesRequest(builder, &fbs_gpu_uuid);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetMaxAllocationBytesRequest, req.o);
   builder.Finish(msg);
 
@@ -221,7 +223,7 @@ uint64_t CudaIpcMemoryManagerAPI::GetMaxAllocationBytes(const boost::uuids::uuid
     throw std::runtime_error("Failed to receive response from server.");
   }
 
-  spdlog::info("Received response : {}", response_msg.size());
+  spdlog::debug("Received response : {}", response_msg.size());
 
   // get response buffer
   auto response_buf  = response_msg.data();
@@ -260,12 +262,12 @@ uint64_t CudaIpcMemoryManagerAPI::GetMaxAllocationBytes(const boost::uuids::uuid
 }
 
 GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost::uuids::uuid gpu_uuid, int32_t expiration_access_count,
-                                                           size_t   expiration_ttl, bool     zero_buffer) {
+                                                           size_t expiration_ttl, bool zero_buffer) {
   spdlog::info("Creating CUDA buffer of size={} bytes on gpu_uuid={}", size, boost::uuids::to_string(gpu_uuid));
   // Build FlatBuffer IPC request
-  flatbuffers::FlatBufferBuilder builder;
+  flatbuffers::FlatBufferBuilder        builder;
   fbs::cuda::ipc::api::ExpirationOption expiration_option(expiration_access_count, expiration_ttl);
-  auto fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
+  auto                                  fbs_gpu_uuid = util::UUIDConverter::toFlatBufferUUID(gpu_uuid);
   auto req = fbs::cuda::ipc::api::CreateCreateCUDABufferRequest(builder, &fbs_gpu_uuid, size, &expiration_option, zero_buffer);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_CreateCUDABufferRequest, req.o);
   builder.Finish(msg);
@@ -283,7 +285,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
     throw std::runtime_error("Failed to receive response from server.");
   }
 
-  spdlog::info("Received response : {}", response_msg.size());
+  spdlog::debug("Received response : {}", response_msg.size());
 
   // get response buffer
   auto response_buf  = response_msg.data();
@@ -351,8 +353,8 @@ GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid
   spdlog::info("Getting CUDA buffer = {}", boost::uuids::to_string(buffer_id));
   //  Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
-  auto req = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
+  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
+  auto                           req          = fbs::cuda::ipc::api::CreateGetCUDABufferRequest(builder, &fb_buffer_id);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_GetCUDABufferRequest, req.o);
   builder.Finish(msg);
 
@@ -430,8 +432,8 @@ void CudaIpcMemoryManagerAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {
 
   // Build FlatBuffer IPC request
   flatbuffers::FlatBufferBuilder builder;
-  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
-  auto req = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
+  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(gpu_buffer.getBufferId());
+  auto                           req          = fbs::cuda::ipc::api::CreateNotifyDoneRequest(builder, &fb_buffer_id, gpu_buffer.getAccessId());
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_NotifyDoneRequest, req.o);
   builder.Finish(msg);
 
@@ -483,8 +485,8 @@ void CudaIpcMemoryManagerAPI::FreeCUDABufferRequest(const boost::uuids::uuid buf
   spdlog::info("Free CUDA buffer = {}", boost::uuids::to_string(buffer_id));
   //  Build FlatBuffer request
   flatbuffers::FlatBufferBuilder builder;
-  auto fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
-  auto req = fbs::cuda::ipc::api::CreateFreeCUDABufferRequest(builder, &fb_buffer_id);
+  auto                           fb_buffer_id = util::UUIDConverter::toFlatBufferUUID(buffer_id);
+  auto                           req          = fbs::cuda::ipc::api::CreateFreeCUDABufferRequest(builder, &fb_buffer_id);
   auto msg = fbs::cuda::ipc::api::CreateRPCRequestMessage(builder, fbs::cuda::ipc::api::RPCRequest_FreeCUDABufferRequest, req.o);
   builder.Finish(msg);
 
