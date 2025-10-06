@@ -10,6 +10,25 @@ include "common.fbs";
 namespace fbs.cuda.ipc.api;
 
 // ---------------------------------------------------------------------------
+// RPC Response Tables
+// --------------------------------------------------------------------------
+table GetAvailableGPUsResponse{
+  gpus: [UUID]; // Array of GPU UUIDs
+}
+
+table GetAllocatedTotalBufferCountResponse {
+  value: uint64; // Total number of allocated buffers
+}
+
+table GetAllocatedTotalBytesResponse {
+  value: uint64; // Total allocated bytes
+}
+
+table GetMaxAllocationBytesResponse {
+  value: uint64; // Maximum allocation size in bytes
+}
+
+// ---------------------------------------------------------------------------
 // Response for buffer creation
 // ---------------------------------------------------------------------------
 table CreateCUDABufferResponse {
@@ -55,6 +74,10 @@ table ErrorResponse {
 // Union of all possible RPC response types
 // ---------------------------------------------------------------------------
 union RPCResponse {
+  GetAvailableGPUsResponse,
+  GetAllocatedTotalBufferCountResponse,
+  GetAllocatedTotalBytesResponse,
+  GetMaxAllocationBytesResponse,
   CreateCUDABufferResponse,
   GetCUDABufferResponse,
   NotifyDoneResponse,

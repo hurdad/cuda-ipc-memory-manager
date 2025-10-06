@@ -13,4 +13,4 @@ add_subdirectory(example)
 
 # Enable testing
 enable_testing()
-add_subdirectory(test)
+add_subdirectory(tests)

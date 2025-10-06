@@ -74,6 +74,18 @@ class CudaIpcMemoryManagerAPI {
   // API Methods
   // ------------------------------------------------------------
 
+  // Returns a list of available GPU UUIDs.
+  std::vector<boost::uuids::uuid> GetAvailableGPUs();
+
+  // Returns the total number of allocated buffers for the specified GPU.
+  uint64_t GetAllocatedTotalBufferCount(const boost::uuids::uuid& gpu_uuid);
+
+  // Returns the total allocated bytes for the specified GPU.
+  uint64_t GetAllocatedTotalBytes(const boost::uuids::uuid& gpu_uuid);
+
+  // Returns the maximum allocation size (in bytes) for the specified GPU.
+  uint64_t GetMaxAllocationBytes(const boost::uuids::uuid& gpu_uuid);
+
   /**
    * @brief Request creation of a new CUDA buffer.
    *

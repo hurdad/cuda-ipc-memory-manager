@@ -1,6 +1,15 @@
 find_package(spdlog REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
 
+
+add_executable(get-info-example
+        GetInfoExample.cpp
+)
+
+target_link_libraries(get-info-example PRIVATE
+        cuda-ipc-memory-manager-api
+)
+
 add_executable(create-buffer-example
        CreateBufferExample.cu
 )
@@ -18,7 +27,7 @@ target_link_libraries(get-buffer-example PRIVATE
 )
 
 add_executable(free-buffer-example
-        FreeBufferExample.cu
+        FreeBufferExample.cpp
 )
 
 target_link_libraries(free-buffer-example PRIVATE
