@@ -10,4 +10,7 @@ target_link_libraries(cuda-util)
 
 target_include_directories(cuda-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_subdirectory(tests)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
