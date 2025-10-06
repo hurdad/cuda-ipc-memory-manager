@@ -9,3 +9,5 @@ add_library(cuda-util STATIC
 target_link_libraries(cuda-util)
 
 target_include_directories(cuda-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(tests)
