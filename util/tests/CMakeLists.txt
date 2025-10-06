@@ -9,11 +9,6 @@ include_directories(${GTEST_INCLUDE_DIRS})
 # Include the main project headers
 include_directories(..)
 
-#target_include_directories(uuidConverterTest
-#        PRIVATE
-#        ${CMAKE_CURRENT_LIST_DIR}/../../schema/external/flatbuffers/include
-#)
-
 # List all test source files
 set(TEST_SOURCES
     CudaUtilsTest.cpp
