@@ -47,6 +47,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  #zmq_ipc_socket:
   prometheus_data:
   grafana_data:

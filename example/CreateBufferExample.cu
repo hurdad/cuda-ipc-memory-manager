@@ -1,7 +1,4 @@
 #include <cuda_runtime.h>
-
-#include <boost/uuid/string_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
 #include <iostream>
 
 #include "CudaIpcMemoryManagerAPI.h"
@@ -16,18 +13,19 @@ __global__ void incrementKernel(float* d, int n) {
 
 int main(int argc, char** argv) {
   try {
-    //  Create an instance of the IPC memory manager API
+    // Create an instance of the IPC memory manager API
     cuda::ipc::api::CudaIpcMemoryManagerAPI api("ipc:///tmp/cuda-ipc-memory-manager-service.ipc");
 
-    std::string gpu_uuid = "ab29f361-2479-f8c8-f2e2-a56c3692a3ac";
+    // Get Available GPUs
+    auto gpus   = api.GetAvailableGPUs();
+    auto gpu_id = gpus.front(); // select first
 
     // Parameters for GPU buffer request
     int                            N = 268435456; // Number of floats
-    boost::uuids::string_generator gen;
-    boost::uuids::uuid             boost_gpu_uuid      = gen(gpu_uuid); // GPU UUID
-    int                            expire_access_count = 0;             // Access count before expiration (0=disable)
-    int                            expire_ttl          = 30;            // Time-to-live in seconds before expiration (0=disable)
-    bool                           zero_buffer         = true;          // Initialize buffer to zero
+    boost::uuids::uuid             boost_gpu_uuid      = gpu_id; // GPU UUID
+    int                            expire_access_count = 0; // Access count before expiration (0=disable)
+    int                            expire_ttl          = 30; // Time-to-live in seconds before expiration (0=disable)
+    bool                           zero_buffer         = true; // Initialize buffer to zero
 
     // Request GPU buffer
     auto gpu_buffer = api.CreateCUDABufferRequest(N * sizeof(float), boost_gpu_uuid, expire_access_count, expire_ttl, zero_buffer);
@@ -49,7 +47,7 @@ int main(int argc, char** argv) {
     cudaDeviceSynchronize();
 
     // Copy a portion of the device buffer to host for printing
-    int printCount = 10;  // number of elements to print
+    int                printCount = 10; // number of elements to print
     std::vector<float> h_data(printCount);
 
     // Copy data from device to host
@@ -64,7 +62,6 @@ int main(int argc, char** argv) {
       std::cout << h_data[i] << " ";
     }
     std::cout << std::endl;
-
   } catch (const std::exception& e) {
     std::cerr << "Exception: " << e.what() << std::endl;
   }
