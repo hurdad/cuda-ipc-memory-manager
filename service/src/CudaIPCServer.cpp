@@ -115,9 +115,11 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
 
+#ifdef HAVE_NVML
   // Register GPU Metrics Collector directly with the exposer
   gpu_metrics_collector_ = std::make_shared<GpuMetricsCollector>(configuration_);
   exposer_->RegisterCollectable(gpu_metrics_collector_);
+#endif
 
   // Register Process Metrics Collector directly with the exposer
   process_metrics_collector_ = std::make_shared<ProcessMetricsCollector>();
