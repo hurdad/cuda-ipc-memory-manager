@@ -32,6 +32,7 @@ cuda-ipc-memory-manager is a utility designed to facilitate efficient GPU memory
 - **C++ Compiler**: C++17 compatible compiler
 - **NVIDIA CUDA Toolkit**: 11.0 or higher
 - **FlatBuffers**: For schema serialization/deserialization
+- **ZeroMQ**: For IPC communication between service and clients
 - **Google Test**: For unit testing (optional, for running tests)
 
 **Runtime Requirements:**
