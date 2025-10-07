@@ -1,11 +1,12 @@
-#include <cuda_runtime.h>
-
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
 
-#include "CudaUtils.h"
+#include <cuda_runtime.h>
+
 #include "spdlog/spdlog.h"
+
+#include "CudaUtils.h"
 
 void CudaUtils::SetDevice(int device_id) {
   spdlog::debug("[CudaUtils] Set device to {}", device_id);

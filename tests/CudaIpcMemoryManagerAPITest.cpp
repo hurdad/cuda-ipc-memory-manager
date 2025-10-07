@@ -79,7 +79,7 @@ TEST_F(CudaIpcMemoryManagerAPITest, NotifyDoneRequest) {
   auto gpus   = api->GetAvailableGPUs();
   auto gpu_id = gpus.front();
 
-  GPUBuffer buffer = api->CreateCUDABufferRequest(512, gpu_id);
+  GPUBuffer buffer = api->CreateCUDABufferRequest(512, gpu_id, 0, 10, false);
   EXPECT_NO_THROW(api->NotifyDoneRequest(buffer));
 }
 
@@ -87,7 +87,7 @@ TEST_F(CudaIpcMemoryManagerAPITest, FreeCUDABufferRequest) {
   auto gpus   = api->GetAvailableGPUs();
   auto gpu_id = gpus.front();
 
-  GPUBuffer buffer = api->CreateCUDABufferRequest(256, gpu_id);
+  GPUBuffer buffer = api->CreateCUDABufferRequest(256, gpu_id, 0, 10, false);
   EXPECT_NO_THROW(api->NotifyDoneRequest(buffer));
   EXPECT_NO_THROW(api->FreeCUDABufferRequest(buffer.getBufferId()));
 
