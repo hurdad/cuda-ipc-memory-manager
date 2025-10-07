@@ -8,7 +8,7 @@ cuda-ipc-memory-manager is a utility designed to facilitate efficient GPU memory
 
 - **IPC Memory Management Service**: Centralized service for managing CUDA IPC memory handles across multiple processes
 - **C++ API**: Easy-to-use C++ API for allocating, sharing, and managing GPU memory via IPC
-- **UUID-based Handle Management**: Track and reference shared memory allocations using unique identifiers
+- **Boost UUID-based Handle Management**: Track and reference shared memory allocations using unique identifiers
 - **CUDA Utilities**: Helper utilities for CUDA operations and error handling
 - **FlatBuffers Schema**: Efficient serialization for communication between service and clients
 - **Observability**: Built-in monitoring and logging capabilities
@@ -22,21 +22,23 @@ cuda-ipc-memory-manager is a utility designed to facilitate efficient GPU memory
 - **`schema/`**: FlatBuffers schemas for efficient serialization of messages between clients and service
 - **`util/`**: Utility functions for CUDA operations and UUID conversion
 - **`tests/`**: Unit tests for validating functionality
-- **`observability/`**: Monitoring and logging infrastructure
+- **`observability/`**: Monitoring and logging infrastructure (includes Grafana dashboard)
 - **`example/`**: Example applications demonstrating usage
 
 ## Dependencies
 
 **Build Requirements:**
-- **CMake**: 3.18 or higher (build system)
+- **CMake**: 3.22.1 or higher (build system)
 - **C++ Compiler**: C++17 compatible compiler
-- **NVIDIA CUDA Toolkit**: 11.0 or higher
+- **NVIDIA CUDA Toolkit**: 
 - **FlatBuffers**: For schema serialization/deserialization
-- **ZeroMQ**: For IPC communication between service and clients
+- **ZeroMQ**: For IPC communication between service and clients (cpp-zmq)
+- **spdlog**: Logging Library
+- **Boost**: UUID, Program Options, and Mutli-Index Container
 - **Google Test**: For unit testing (optional, for running tests)
 
 **Runtime Requirements:**
-- **NVIDIA GPU**: With CUDA compute capability 3.5 or higher
+- **NVIDIA GPU**: 
 - **NVIDIA Driver**: Compatible with CUDA Toolkit version
 - **Docker** (optional): For containerized deployment
 - **Docker Compose** (optional): For orchestrated multi-container setup
