@@ -1,7 +1,8 @@
+#ifdef HAVE_NVML
+
 #include "GpuMetricsCollector.h"
 
 #include <prometheus/metric_family.h>
-// #include <cuda_runtime.h>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -167,3 +168,4 @@ std::vector<prometheus::MetricFamily> GpuMetricsCollector::Collect() const {
   mfs.push_back(gpuCudaMemTotalProcessFamily);
   return mfs;
 }
+#endif
