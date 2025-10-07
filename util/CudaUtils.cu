@@ -100,6 +100,7 @@ int CudaUtils::GetDeviceIdFromUUID(const boost::uuids::uuid& gpu_uuid) {
 
     boost::uuids::uuid device_uuid;
     std::copy(std::begin(prop.uuid.bytes), std::end(prop.uuid.bytes), device_uuid.begin());
+    spdlog::debug("Found gpu : {} @ index : {}", boost::uuids::to_string(device_uuid), i);
 
     if (device_uuid == gpu_uuid) {
       return i; // Found matching device
