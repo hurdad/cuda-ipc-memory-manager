@@ -64,7 +64,6 @@ TEST_F(CudaIpcMemoryManagerAPITest, CreateAndGetCUDABufferRequest) {
 
   EXPECT_NE(buffer.getDataPtr(), nullptr);
   EXPECT_EQ(buffer.getSize(), 1024);
-  // EXPECT_GT(buffer.getCudaDeviceId(), 0); // adjust based on your test GPU id
   EXPECT_GT(buffer.getAccessId(), 0);
   EXPECT_NO_THROW(api->NotifyDoneRequest(buffer));
 
@@ -72,6 +71,7 @@ TEST_F(CudaIpcMemoryManagerAPITest, CreateAndGetCUDABufferRequest) {
   GPUBuffer fetched = api->GetCUDABufferRequest(buffer.getBufferId());
   EXPECT_EQ(fetched.getBufferId(), buffer.getBufferId());
   EXPECT_EQ(fetched.getSize(), buffer.getSize());
+  EXPECT_EQ(fetched.getDataPtr(), buffer.getDataPtr());
   EXPECT_NO_THROW(api->NotifyDoneRequest(fetched));
 }
 
