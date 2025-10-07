@@ -13,6 +13,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     libcurl4-openssl-dev \
     zlib1g-dev \
     libnvidia-ml-dev \
+    libgtest-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir

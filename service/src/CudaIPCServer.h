@@ -32,8 +32,10 @@
 #include "api/rpc_response_generated.h"
 #include "service_generated.h"
 
+#ifdef HAVE_NVML
 // GPU Metrics
 #include "GpuMetricsCollector.h"
+#endif
 
 // Process Metrics
 #include "ProcessMetricsCollector.hpp"
@@ -114,8 +116,9 @@ private:
     prometheus::Histogram* notify_done_latency_;
     prometheus::Histogram* free_buffer_latency_;
     prometheus::Histogram* expire_buffers_latency_;
-
+#ifdef HAVE_NVML
     std::shared_ptr<GpuMetricsCollector> gpu_metrics_collector_;
+#endif
     std::shared_ptr<ProcessMetricsCollector> process_metrics_collector_;
 };
 

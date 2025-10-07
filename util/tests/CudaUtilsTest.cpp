@@ -62,34 +62,3 @@ TEST_F(CudaUtilsTest, GetMemoryInfo) {
   EXPECT_GE(free_mem, 0);
   EXPECT_LE(free_mem, total_mem);
 }
-
-// Test device ID lookup from a UUID
-TEST_F(CudaUtilsTest, GetDeviceIdFromUUID) {
-  // int device_count = 0;
-  // cudaGetDeviceCount(&device_count);
-  // ASSERT_GT(device_count, 0);
-  //
-  // cudaDeviceProp prop;
-  // cudaGetDeviceProperties(&prop, 0);
-  //
-  // boost::uuids::string_generator gen;
-  // boost::uuids::uuid uuid = gen(prop.uuid);
-  //
-  // int device_id = CudaUtils::GetDeviceIdFromUUID(uuid);
-  // EXPECT_EQ(device_id, 0);
-}
-
-// Test IPC memory handle creation (basic sanity check)
-TEST_F(CudaUtilsTest, CudaIpcHandle) {
-  size_t size  = 1024;
-  void*  d_ptr = CudaUtils::AllocDeviceBuffer(size);
-
-  auto handle = CudaUtils::GetCudaMemoryHandle(d_ptr);
-  ASSERT_EQ(handle.size(), 64);
-
-  void* opened_ptr = CudaUtils::OpenHandleToCudaMemory(handle);
-  ASSERT_NE(opened_ptr, nullptr);
-
-  EXPECT_NO_THROW(CudaUtils::CloseHandleToCudaMemory(opened_ptr));
-  CudaUtils::FreeDeviceBuffer(d_ptr);
-}

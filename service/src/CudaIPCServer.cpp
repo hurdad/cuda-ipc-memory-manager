@@ -115,9 +115,11 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
   // Register the registry with exposer
   exposer_->RegisterCollectable(registry_);
 
+#ifdef HAVE_NVML
   // Register GPU Metrics Collector directly with the exposer
   gpu_metrics_collector_ = std::make_shared<GpuMetricsCollector>(configuration_);
   exposer_->RegisterCollectable(gpu_metrics_collector_);
+#endif
 
   // Register Process Metrics Collector directly with the exposer
   process_metrics_collector_ = std::make_shared<ProcessMetricsCollector>();
@@ -287,7 +289,7 @@ void CudaIPCServer::handleGetAvailableGPUs(const fbs::cuda::ipc::api::GetAvailab
   }
 
   // init flatbuffers response
-  auto resp_offset = fbs::cuda::ipc::api::CreateGetAvailableGPUsResponseDirect(response_builder);
+  auto resp_offset = fbs::cuda::ipc::api::CreateGetAvailableGPUsResponseDirect(response_builder, &gpu_uuids);
 
   // finish up response message
   auto msg =
@@ -304,7 +306,7 @@ void CudaIPCServer::handleGetAllocatedTotalBufferCount(const fbs::cuda::ipc::api
 
   // lookup allocated_buffers metric
   auto allocated_buffers_it = allocated_buffers_map_.find(boost_gpu_uuid);
-  if (allocated_buffers_it != allocated_buffers_map_.end()) {
+  if (allocated_buffers_it == allocated_buffers_map_.end()) {
     throw std::runtime_error("GPU UUID not found!");
   }
   auto value = allocated_buffers_it->second->Value();
@@ -328,7 +330,7 @@ void CudaIPCServer::handleGetAllocatedTotalBytes(const fbs::cuda::ipc::api::GetA
 
   // lookup allocated_bytes metric
   auto allocated_bytes_it = allocated_bytes_map_.find(boost_gpu_uuid);
-  if (allocated_bytes_it != allocated_bytes_map_.end()) {
+  if (allocated_bytes_it == allocated_bytes_map_.end()) {
     throw std::runtime_error("GPU UUID not found!");
   }
   auto value = allocated_bytes_it->second->Value();
@@ -351,7 +353,7 @@ void CudaIPCServer::handleGetMaxAllocationBytesRequest(const fbs::cuda::ipc::api
 
   // lookup max_gpu_allocated_memory_
   auto max_gpu_allocated_memory_it = max_gpu_allocated_memory_.find(boost_gpu_uuid);
-  if (max_gpu_allocated_memory_it != max_gpu_allocated_memory_.end()) {
+  if (max_gpu_allocated_memory_it == max_gpu_allocated_memory_.end()) {
     throw std::runtime_error("GPU UUID not found!");
   }
   auto value = max_gpu_allocated_memory_it->second;
