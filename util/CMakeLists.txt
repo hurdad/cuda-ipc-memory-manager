@@ -1,3 +1,4 @@
+find_package(spdlog REQUIRED)
 find_package(Boost REQUIRED)
 
 add_library(cuda-util STATIC
@@ -6,7 +7,7 @@ add_library(cuda-util STATIC
         UUIDConverter.hpp
 )
 
-target_link_libraries(cuda-util)
+target_link_libraries(cuda-util PRIVATE spdlog::spdlog)
 
 target_include_directories(cuda-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

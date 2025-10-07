@@ -2,8 +2,10 @@
 #define CUDA_UTILS_H
 
 #include <array>
+
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <spdlog/spdlog.h>  // spdlog core logging library
 
 /**
  * Macro to wrap CUDA API calls.
