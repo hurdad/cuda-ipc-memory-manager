@@ -13,7 +13,7 @@ cuda-ipc-memory-manager is a utility designed to facilitate efficient GPU memory
 - **Boost UUID-based Handle Management**: Track and reference shared memory allocations using unique identifiers
 - **CUDA Utilities**: Helper utilities for CUDA operations and error handling
 - **FlatBuffers Schema**: Efficient serialization for communication between service and clients
-- **Observability**: Built-in monitoring and logging capabilities
+- **Observability**: Built-in prometheus monitoring and logging capabilities
 - **Docker Support**: Containerized deployment with Docker and Docker Compose
 - **Comprehensive Testing**: Unit tests for core components including CUDA utilities and UUID conversion
 
