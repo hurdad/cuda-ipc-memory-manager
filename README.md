@@ -8,6 +8,8 @@ cuda-ipc-memory-manager is a utility designed to facilitate efficient GPU memory
 
 - **IPC Memory Management Service**: Centralized service for managing CUDA IPC memory handles across multiple processes
 - **C++ API**: Easy-to-use C++ API for allocating, sharing, and managing GPU memory via IPC
+- **Multi-GPU**: Allocate GPU memory on selected GPUs
+- **Configurable GPU Buffer Expiration Options**: Multiple options for automatically expiring unused buffers
 - **Boost UUID-based Handle Management**: Track and reference shared memory allocations using unique identifiers
 - **CUDA Utilities**: Helper utilities for CUDA operations and error handling
 - **FlatBuffers Schema**: Efficient serialization for communication between service and clients
