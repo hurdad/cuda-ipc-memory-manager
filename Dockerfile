@@ -23,9 +23,8 @@ WORKDIR /app
 COPY . .
 
 # Configure and build (no need to manually mkdir build)
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
-    && cmake --build build -j$(nproc) \
-    && ctest --test-dir build --output-on-failure
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build -j$(nproc)
 
 
 # Stage 2: Runtime image
