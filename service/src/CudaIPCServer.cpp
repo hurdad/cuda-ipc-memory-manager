@@ -545,7 +545,9 @@ void CudaIPCServer::handleNotifyDone(const fbs::cuda::ipc::api::NotifyDoneReques
       record.last_activity_timestamp = std::chrono::steady_clock::now(); // update last activity timestamp
 
       // decrement access count if enabled
-      if (record.expiration_option.access_count() > 0) record.access_count--;
+      if (record.expiration_option.access_count() > 0 && record.access_count > 0) {
+        record.access_count--;
+      }
     });
   } // lock released here
 
