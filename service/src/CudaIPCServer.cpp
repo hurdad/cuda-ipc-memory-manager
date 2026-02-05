@@ -135,8 +135,8 @@ CudaIPCServer::CudaIPCServer(const fbs::cuda::ipc::service::Configuration* confi
 }
 
 CudaIPCServer::~CudaIPCServer() {
-  if (server_thread_.joinable()) server_thread_.join();
-  if (expiration_thread_.joinable()) expiration_thread_.join();
+  stop();
+  join();
 }
 
 void CudaIPCServer::start() {
