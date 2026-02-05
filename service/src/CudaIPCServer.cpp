@@ -399,7 +399,7 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // generate ids
   auto buffer_id = generateUUID();
-  auto access_id = rand();
+  auto access_id = generateAccessId();
 
   // convert to uuid flatbuffer
   auto uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(buffer_id);
@@ -494,7 +494,7 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
     GPUBufferRecord& gpu_buffer_entry = const_cast<GPUBufferRecord&>(*it);
 
     // generate access id
-    auto access_id = rand();
+    auto access_id = generateAccessId();
 
     // update buffer entry - add new access_id and update last activity timestamp
     id_index.modify(it, [access_id](GPUBufferRecord& record) {
@@ -617,6 +617,10 @@ boost::uuids::uuid CudaIPCServer::generateUUID() {
   // static ensures the generator is constructed only once
   static boost::uuids::random_generator gen;
   return gen();
+}
+
+uint32_t CudaIPCServer::generateAccessId() {
+  return access_id_counter_.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 void CudaIPCServer::expirationLoop(const uint32_t expiration_thread_interval_ms) {
