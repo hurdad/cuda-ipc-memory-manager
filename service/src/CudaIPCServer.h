@@ -100,6 +100,7 @@ private:
 
     static boost::uuids::uuid generateUUID();
     static bool setThreadRealtime(std::thread& t);
+    uint32_t generateAccessId();
 
     // Prometheus metrics
     std::shared_ptr<prometheus::Registry> registry_;
@@ -120,6 +121,7 @@ private:
     std::shared_ptr<GpuMetricsCollector> gpu_metrics_collector_;
 #endif
     std::shared_ptr<ProcessMetricsCollector> process_metrics_collector_;
+    std::atomic<uint32_t> access_id_counter_{0};
 };
 
 #endif // CUDA_UTILS_H
