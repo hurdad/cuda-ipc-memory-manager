@@ -6,8 +6,10 @@
 #include "api/rpc_response_generated.h"
 
 namespace cuda::ipc::api {
-CudaIpcMemoryManagerAPI::CudaIpcMemoryManagerAPI(const std::string& endpoint) : context_(1), socket_(context_, zmq::socket_type::req) {
+CudaIpcMemoryManagerAPI::CudaIpcMemoryManagerAPI(const std::string& endpoint, int receive_timeout_ms)
+  : context_(1), socket_(context_, zmq::socket_type::req) {
   socket_.connect(endpoint);
+  socket_.set(zmq::sockopt::rcvtimeo, receive_timeout_ms);
   spdlog::cfg::load_env_levels();
 }
 
