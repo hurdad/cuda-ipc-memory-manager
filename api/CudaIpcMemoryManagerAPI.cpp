@@ -331,13 +331,13 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
     throw std::runtime_error("Received null ipc_handle in response.");
   }
 
-  auto access_id = create_response->access_id();
-  auto gpu_uuid  = create_response->gpu_uuid();
-  if (!gpu_uuid) {
+  auto access_id        = create_response->access_id();
+  auto response_gpu_uuid = create_response->gpu_uuid();
+  if (!response_gpu_uuid) {
     throw std::runtime_error("Received null gpu_uuid in response.");
   }
 
-  auto device_id = CudaUtils::GetDeviceIdFromUUID(util::UUIDConverter::toBoostUUID(*gpu_uuid));
+  auto device_id = CudaUtils::GetDeviceIdFromUUID(util::UUIDConverter::toBoostUUID(*response_gpu_uuid));
 
   // make sure response gpu buffer size matches the requested gpu buffer size
   assert(size == create_response->size());
