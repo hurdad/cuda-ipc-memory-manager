@@ -53,7 +53,7 @@ public:
 class CudaIpcMemoryManagerAPI {
 public:
   // Constructor / Destructor
-  explicit CudaIpcMemoryManagerAPI(const std::string& endpoint);
+  explicit CudaIpcMemoryManagerAPI(const std::string& endpoint, int receive_timeout_ms = 5000);
   ~CudaIpcMemoryManagerAPI();
 
   // ==========================================================
