@@ -406,11 +406,12 @@ void CudaIPCServer::handleCreateBuffer(const fbs::cuda::ipc::api::CreateCUDABuff
 
   // init flatbuffers response
   auto resp = fbs::cuda::ipc::api::CreateCUDABufferResponseBuilder(response_builder);
+  auto gpu_uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(boost_gpu_uuid);
+  resp.add_gpu_uuid(&gpu_uuid_flatbuffer);
   resp.add_buffer_id(&uuid_flatbuffer);
+  resp.add_ipc_handle(&cuda_ipc_memory_handle);
   resp.add_size(req->size());
   resp.add_access_id(access_id);
-  resp.add_ipc_handle(&cuda_ipc_memory_handle);
-  resp.add_cuda_device_id(device_id);
 
   // create entry and save device pointer, size and handle
   GPUBufferRecord new_entry;
@@ -503,7 +504,8 @@ void CudaIPCServer::handleGetBuffer(const fbs::cuda::ipc::api::GetCUDABufferRequ
     });
 
     // init flatbuffers success response
-    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(response_builder, gpu_buffer_entry.cuda_gpu_device_index,
+    auto gpu_uuid_flatbuffer = util::UUIDConverter::toFlatBufferUUID(gpu_buffer_entry.gpu_uuid);
+    auto resp = fbs::cuda::ipc::api::CreateGetCUDABufferResponse(response_builder, &gpu_uuid_flatbuffer,
                                                                  &gpu_buffer_entry.ipc_handle, gpu_buffer_entry.size, access_id);
     auto msg = fbs::cuda::ipc::api::CreateRPCResponseMessage(response_builder, fbs::cuda::ipc::api::RPCResponse_GetCUDABufferResponse, resp.o);
     response_builder.Finish(msg);

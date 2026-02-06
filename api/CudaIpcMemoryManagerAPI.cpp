@@ -332,7 +332,12 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
   }
 
   auto access_id = create_response->access_id();
-  auto device_id = create_response->cuda_device_id();
+  auto gpu_uuid  = create_response->gpu_uuid();
+  if (!gpu_uuid) {
+    throw std::runtime_error("Received null gpu_uuid in response.");
+  }
+
+  auto device_id = CudaUtils::GetDeviceIdFromUUID(util::UUIDConverter::toBoostUUID(*gpu_uuid));
 
   // make sure response gpu buffer size matches the requested gpu buffer size
   assert(size == create_response->size());
@@ -348,7 +353,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::CreateCUDABufferRequest(uint64_t size, boost:
   void* d_ptr = CudaUtils::OpenHandleToCudaMemory(ipc_handle_arr);
 
   // build return struct GPUBuffer
-  return GPUBuffer(d_ptr, size, util::UUIDConverter::toBoostUUID(*buffer_id), access_id, device_id);
+  return GPUBuffer(d_ptr, size, util::UUIDConverter::toBoostUUID(*buffer_id), access_id);
 }
 
 GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid buffer_id) {
@@ -410,9 +415,14 @@ GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid
     throw std::runtime_error("Received null ipc_handle in response.");
   }
 
-  auto access_id      = get_response->access_id();
-  auto size           = get_response->size();
-  auto cuda_device_id = get_response->cuda_device_id();
+  auto access_id = get_response->access_id();
+  auto size      = get_response->size();
+  auto gpu_uuid  = get_response->gpu_uuid();
+  if (!gpu_uuid) {
+    throw std::runtime_error("Received null gpu_uuid in response.");
+  }
+
+  auto cuda_device_id = CudaUtils::GetDeviceIdFromUUID(util::UUIDConverter::toBoostUUID(*gpu_uuid));
 
   // set cuda device before we get memory handle
   CudaUtils::SetDevice(cuda_device_id);
@@ -425,7 +435,7 @@ GPUBuffer CudaIpcMemoryManagerAPI::GetCUDABufferRequest(const boost::uuids::uuid
   void* d_ptr = CudaUtils::OpenHandleToCudaMemory(ipc_handle_arr);
 
   // build return struct GPUBuffer
-  return GPUBuffer(d_ptr, size, buffer_id, access_id, cuda_device_id);
+  return GPUBuffer(d_ptr, size, buffer_id, access_id);
 }
 
 void CudaIpcMemoryManagerAPI::NotifyDoneRequest(const GPUBuffer& gpu_buffer) {

@@ -27,12 +27,11 @@ private:
   size_t             size; // Total size of the GPU buffer in bytes
   boost::uuids::uuid buffer_id; // Unique identifier for this buffer
   uint32_t           access_id; // Access count or handle identifier
-  int                cuda_device_id; // CUDA device id/index where this buffer resides
 
 public:
   // Constructor
-  GPUBuffer(void* ptr, size_t sz, const boost::uuids::uuid& id, uint32_t access, int device_id)
-    : d_ptr(ptr), size(sz), buffer_id(id), access_id(access), cuda_device_id(device_id) {
+  GPUBuffer(void* ptr, size_t sz, const boost::uuids::uuid& id, uint32_t access)
+    : d_ptr(ptr), size(sz), buffer_id(id), access_id(access) {
   }
 
   // Getters
@@ -40,7 +39,6 @@ public:
   size_t                    getSize() const { return size; }
   const boost::uuids::uuid& getBufferId() const { return buffer_id; }
   uint32_t                  getAccessId() const { return access_id; }
-  int                       getCudaDeviceId() const { return cuda_device_id; }
 };
 
 // ============================================================
