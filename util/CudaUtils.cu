@@ -52,6 +52,25 @@ void CudaUtils::CopyToHost(void* h_buffer, const void* d_buffer, size_t numBytes
 }
 
 const std::array<uint8_t, 64> CudaUtils::GetCudaMemoryHandle(void* d_ptr) {
+  if (!d_ptr) {
+    throw std::runtime_error("[CudaUtils] GetCudaMemoryHandle failed: nullptr argument");
+  }
+
+  cudaPointerAttributes attrs{};
+  CUDA_CHECK(cudaPointerGetAttributes(&attrs, d_ptr));
+
+  if (attrs.type != cudaMemoryTypeDevice) {
+    throw std::runtime_error("[CudaUtils] GetCudaMemoryHandle failed: pointer is not device memory");
+  }
+  int pointer_device = attrs.device;
+
+  int current_device = -1;
+  CUDA_CHECK(cudaGetDevice(&current_device));
+  if (current_device != pointer_device) {
+    spdlog::debug("[CudaUtils] Switching device context from {} to {} for CUDA IPC handle creation", current_device, pointer_device);
+    CUDA_CHECK(cudaSetDevice(pointer_device));
+  }
+
   cudaIpcMemHandle_t handle;
   // Create IPC handle for device memory; throws on failure
   CUDA_CHECK(cudaIpcGetMemHandle(&handle, d_ptr));

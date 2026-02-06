@@ -34,7 +34,7 @@ table GetMaxAllocationBytesRequest {
 // This request is typically sent by a client to the CUDA IPC service.
 // ---------------------------------------------------------------------------
 table CreateCUDABufferRequest {
-  gpu_uuid: UUID (required);    // UUID of the target GPU device where the buffer should be created (response includes cuda_device_id)
+  gpu_uuid: UUID (required);    // UUID of the target GPU device where the buffer should be created
   size: uint64;                 // Size of the buffer in bytes to be allocated on the GPU
   expiration: ExpirationOption; // Expiration policy for the buffer, defined in common.fbs
   zero_buffer: bool;            // Write zeros to the new buffer cudaMemset(ptr, 0, size)
